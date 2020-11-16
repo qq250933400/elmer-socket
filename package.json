@@ -1,19 +1,19 @@
 {
-  "name": "elmer-socket",
-  "version": "1.0.0",
-  "description": "websocket",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "elmer s j mo",
-  "license": "ISC",
-  "dependencies": {
-    "colors": "^1.4.0",
-    "elmer-common": "^0.1.8",
-    "ws": "^7.4.0"
-  },
-  "devDependencies": {
-    "@types/ws": "^7.4.0"
-  }
+    "name": "elmer-socket",
+    "version": "1.0.1",
+    "description": "websocket",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "elmer s j mo",
+    "license": "ISC",
+    "dependencies": {
+        "colors": "^1.4.0",
+        "elmer-common": "^0.1.8",
+        "ws": "^7.4.0"
+    },
+    "devDependencies": {
+        "@types/ws": "^7.4.0"
+    }
 }
