@@ -1,4 +1,28 @@
 import fs from "fs";
+import { StaticCommon as utils } from "elmer-common";
+
+export const getHost = () => {
+    return function(target: any, attrKey: string) {
+        Object.defineProperty(target, attrKey, {
+            configurable: false,
+            enumerable: true,
+            get: function() {
+                return utils.getValue(this.config, "host");
+            }
+        });
+    }
+}
+export const getPort = () => {
+    return function(target: any, attrKey: string) {
+        Object.defineProperty(target, attrKey, {
+            configurable: false,
+            enumerable: true,
+            get: function() {
+                return utils.getValue(this.config, "port");
+            }
+        });
+    }
+}
 
 export default (target:Function) => {
     const packageFile = process.cwd() + "/package.json";

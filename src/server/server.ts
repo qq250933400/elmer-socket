@@ -1,7 +1,7 @@
 import { IncomingMessage } from "http";
 import { Server as WebSocketServer } from "ws";
 import { CommonUtils } from "../utils/CommonUtils";
-import Config from "./config";
+import Config, { getHost, getPort } from "./config";
 import { ServerSocket } from "./ServerSocket";
 import { TypeWebsocketConfig } from "./IServerSocket";
 
@@ -10,6 +10,12 @@ export class SocketServer extends CommonUtils{
     config: TypeWebsocketConfig;
     connections: any = {};
     plugins: any[] = [];
+
+    @getHost()
+    private host:string;
+    @getPort()
+    private port:number;
+
     /**
      * 
      * @param {object[]} plugin 自定义业务处理插件, 引入插件需要创建实例化对象
@@ -21,8 +27,8 @@ export class SocketServer extends CommonUtils{
         }
     }
     listen(): void {
-        const host = this.config.host || "localhost";
-        const port = this.config.port || 3000;
+        const host = this.host || "localhost";
+        const port = this.port || 3000;
         const ioServer = new WebSocketServer({
             port,
             host
