@@ -1,3 +1,4 @@
+import { SocketClient } from "./client";
 import { TypeMsgData } from "../server/IServerSocket";
 
 export const SendFileTypes = {
@@ -17,6 +18,7 @@ export type TypeReceiveFileEvent = {
 };
 
 export default abstract class WebsocketPlugin {
+    socket: SocketClient;
     /**
      * 连接断开事件
      */

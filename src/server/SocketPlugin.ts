@@ -1,5 +1,6 @@
 import { TypeMsgData, TypeSocketEvent } from "./IServerSocket";
 import { CommonUtils } from "../utils/CommonUtils";
+import { IncomingMessage } from "http";
 
 export default abstract class SocketPlugin extends CommonUtils {
     /**
@@ -9,4 +10,7 @@ export default abstract class SocketPlugin extends CommonUtils {
      * @param msgEvent 原始消息事件对象
      */
     onMessage?(event: TypeSocketEvent, msgData: TypeMsgData, msgEvent: MessageEvent):void;
+    onConnection?(event: TypeSocketEvent, invMsg: IncomingMessage): void;
+    onClose?(event: TypeSocketEvent, uid: string): void;
+    onError?(event: TypeSocketEvent, error:any): void;
 }

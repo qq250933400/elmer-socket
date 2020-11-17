@@ -6,7 +6,7 @@ export type TypeWebsocketConfig = {
 };
 
 export type TypeBaseMsgType = "Connected" | "Chat" | "SendFileProcessing" | "SendFileEnd" | "SendFileResp"|"SendFileComplete";
-export type TypePluginLifeCycle = "onMessage";
+export type TypePluginLifeCycle = "onMessage"|"onConnection"|"onClose"|"onError";
 
 
 export type TypeMsgData<T={}> = {

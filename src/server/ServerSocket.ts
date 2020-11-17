@@ -40,6 +40,7 @@ export class ServerSocket extends CommonUtils {
         this.options = options;
         this.userAgent = <any>options?.request.headers["user-agent"];
         this.startListen();
+        this.callPluginMethod("onConnection", options.request);
     }
     close(): void {
         try{
@@ -232,9 +233,11 @@ export class ServerSocket extends CommonUtils {
         this.socket.onerror = (ev) => {
             if(!this.ajaxHandler(ev)) {
                 console.error(ev);
+                this.callPluginMethod("onError", ev);
             }
         }
         this.socket.onclose = () => {
+            this.callPluginMethod("onClose", this.options.id);
             typeof this?.options?.onClose === "function" && this?.options?.onClose(this?.options?.id);
         }
         this.send({

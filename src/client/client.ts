@@ -1,5 +1,6 @@
-import ClientReceiveFile from "./ClientReceiveFIle";
+import ClientReceiveFile from "./ClientReceiveFile";
 import { TypeMsgData } from "../server/IServerSocket";
+import { StaticCommon as utils } from "elmer-common";
 
 type TypeSocketClientOption = {
     host: string;
@@ -9,10 +10,11 @@ type TypeSocketClientOption = {
 
 type PluginLifeCycle = "onClose" | "onError" | "onConnected" | "onMessage" | "onStartReceiveFile" | "onEndReceiveFile";
 
-export class SocketClient {
+export class SocketClient<T={}> {
     options: TypeSocketClientOption;
     socket: WebSocket;
     fileObj: ClientReceiveFile;
+    msgListener: any = {};
     constructor(option: TypeSocketClientOption) {
         this.options = option;
         this.connection(option);
@@ -27,9 +29,48 @@ export class SocketClient {
             this.fileObj = new ClientReceiveFile(this.socket);
             this.fileObj.on("Start", this.onStartReceiveFile.bind(this));
             this.fileObj.on("End", this.onEndReceiveFile.bind(this));
+            this.initPlugin();
         } catch(e) {
             this.onError(e);
         }
+    }
+    send(msgData: TypeMsgData<T>): void {
+        if(msgData.data instanceof Blob || msgData.data instanceof Buffer || msgData.data instanceof ArrayBuffer) {
+            this.socket.send(msgData.data);
+        } else {
+            if(utils.isEmpty(msgData.msgId)) {
+                msgData.msgId = utils.guid();
+            }
+            this.socket.send(JSON.stringify(msgData));
+        }
+    }
+    sendAsync(msgData: TypeMsgData<T>, timeout=30000): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const msgId = utils.guid();
+            msgData.msgId = msgId;
+            if(!msgData.shouldBack || utils.isEmpty(msgData.backMsgType)) {
+                reject({
+                    statusCode: "MISSING_DATA",
+                    message: "To send a message in sendAsync mode, shouldBack must be true and backMsgType cannot be empty"
+                });
+            } else {
+                const timeHandler = setInterval(() => {
+                    reject({
+                        statusCode: "TIMEOUT",
+                        message: "Sending message timed out, no information returned or no application response。"
+                    });
+                    clearInterval(timeHandler);
+                    delete this.msgListener[msgId];
+                }, timeout);
+                (<any>msgData.backMsgType) = "Promise_" + msgData.backMsgType;
+                this.msgListener[msgId] = {
+                    timeHandler,
+                    resolve,
+                    reject
+                };
+                this.send(msgData);
+            }
+        });
     }
     private onClose(): void {
         this.callPlugin("onClose");
@@ -47,7 +88,19 @@ export class SocketClient {
                 if(msgData.msgType === "Connected") {
                     this.callPlugin("onConnected", msgData);
                 } else {
-                    this.callPlugin("onMessage", msgData);
+                    if(/^Promise\_/.test(msgData.msgType as any) && !utils.isEmpty(msgData.msgId)) {
+                        // 针对需要以promise处理返回消息的方式
+                        const listener = this.msgListener[msgData.msgId as string];
+                        if(listener) {
+                            clearTimeout(listener.timeHandler);
+                            listener.resolve(msgData.data);
+                            delete this.msgListener[msgData.msgId as string];
+                        } else {
+                            this.callPlugin("onMessage", msgData);
+                        }
+                    } else {
+                        this.callPlugin("onMessage", msgData);
+                    }
                 }
             }
         } else {
@@ -74,6 +127,15 @@ export class SocketClient {
     private callPlugin(name: PluginLifeCycle, ...arg:any[]): void {
         this.options?.plugin?.map((plugin:any) => {
             typeof plugin[name] === "function" && plugin[name].apply(plugin, arg);
+        });
+    }
+    /**
+     * 在此方法绑定一些数据到Plugin对象
+     */
+    private initPlugin(): void {
+        console.log("初始化插件");
+        this.options?.plugin?.map((plugin:any) => {
+            utils.defineReadOnlyProperty(plugin, "socket", this);
         });
     }
 }
