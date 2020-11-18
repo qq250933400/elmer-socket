@@ -5,7 +5,6 @@ import {
     TypeServerSocketEvent,
     TypeMsgData
 } from "./IServerSocket";
-import fs from "fs";
 import { queueCallFunc } from "elmer-common";
 
 type TypeServerSorketOptions = {
@@ -51,7 +50,7 @@ export class ServerSocket extends CommonUtils {
         }
     }
     send<T={}>(msg:TypeMsgData<T>): void {
-        if(this.isArray(msg.data) || this.isObject(msg.data) ||this.isString(msg.data) || this.isNumeric(msg.data)) {
+        if(this.isEmpty(msg.data) || this.isArray(msg.data) || this.isObject(msg.data) ||this.isString(msg.data) || this.isNumeric(msg.data)) {
             if(this.isEmpty(msg.msgId)) {
                 msg.msgId = this.guid();
             }
@@ -80,6 +79,7 @@ export class ServerSocket extends CommonUtils {
     }
     sendFile(fileName: string, timeout: number = 30000): Promise<any> {
         return new Promise<any>((resolve, reject) => {
+            const fs = require("fs");
             if(!fs.existsSync(fileName)) {
                 reject({
                     statusCode: "FILE_NOT_FOUND",
@@ -119,7 +119,7 @@ export class ServerSocket extends CommonUtils {
                         });
                         index += 1;
                     });
-                    readStream.on("error", (err) => {
+                    readStream.on("error", (err:any) => {
                         console.error(err.stack);
                         reject({
                             statusCode:"SEND_FILE_FAIL",

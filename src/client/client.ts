@@ -6,6 +6,7 @@ type TypeSocketClientOption = {
     host: string;
     port: number;
     plugin?: any[];
+    canRetryConnect?: boolean;
 };
 
 type PluginLifeCycle = "onClose" | "onError" | "onConnected" | "onMessage" | "onStartReceiveFile" | "onEndReceiveFile";
@@ -15,6 +16,7 @@ export class SocketClient<T={}> {
     socket: WebSocket;
     fileObj: ClientReceiveFile;
     msgListener: any = {};
+    private retryHandler: any;
     constructor(option: TypeSocketClientOption) {
         this.options = option;
         this.connection(option);
@@ -42,6 +44,9 @@ export class SocketClient<T={}> {
         } else {
             if(utils.isEmpty(msgData.msgId)) {
                 msgData.msgId = utils.guid();
+            }
+            if(utils.isEmpty(msgData.data)) {
+                msgData.data = "";
             }
             this.socket.send(JSON.stringify(msgData));
         }
@@ -83,12 +88,21 @@ export class SocketClient<T={}> {
     }
     private onClose(): void {
         this.callPlugin("onClose");
+        if(!this.retryHandler) {
+            this.retryHandler = setInterval(() => {
+                console.log(`Try reconnecting to the server [ws://${this?.options?.host}:${this?.options?.port}]`);
+                this.connection(this.options);
+            }, 1000);
+        }
     }
     private onError(err:any): void {
         this.callPlugin("onError", err);
     }
     private onConnected(): void {
         this.callPlugin("onConnected");
+        if(this.retryHandler) {
+            clearInterval(this.retryHandler);
+        }
     }
     private onMessage(evt:MessageEvent): void {
         if(typeof evt.data === "string" && evt.data.length > 0) {
@@ -113,9 +127,10 @@ export class SocketClient<T={}> {
                 }
             }
         } else {
-            if(evt.data instanceof Blob) {
+            console.log(utils.getType(evt.data));
+            if(utils.getType(evt.data) === "[object Blob]") {
                 this.fileObj.onReceiveBlob(evt.data);
-            } else if(evt.data instanceof Buffer) {
+            } else if(utils.getType(evt.data) === "[object Buffer]") {
                 this.fileObj.onReceiveBuffer(evt.data);
             } else {
                 // tslint:disable-next-line: no-console

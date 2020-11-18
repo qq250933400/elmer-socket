@@ -27,6 +27,6 @@ export type TypeSocketEvent<T = {}> = {
     data: TypeMsgData<T>;
 };
 
-export type TypeServerSocketEvent = TypeSocketEvent & {
-    sendToAll<T={}>(msgData:TypeMsgData<T>, ignoreList?: string[]):void;
+export type TypeServerSocketEvent<T={}> = TypeSocketEvent<T> & {
+    sendToAll<B={}>(msgData:TypeMsgData<B>, ignoreList?: string[]):void;
 };
