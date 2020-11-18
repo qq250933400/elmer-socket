@@ -21,7 +21,8 @@ export class SocketClient<T={}> {
     }
     connection(option: TypeSocketClientOption): void {
         try {
-            this.socket = new WebSocket(`ws://${option.host}:${option.port}`);
+            const connectionString = `ws://${option.host}:${option.port}`;
+            this.socket = this.createSocket(connectionString);
             this.socket.onmessage = this.onMessage.bind(this);
             this.socket.onopen = this.onConnected.bind(this);
             this.socket.onerror = this.onError.bind(this);
@@ -35,8 +36,9 @@ export class SocketClient<T={}> {
         }
     }
     send(msgData: TypeMsgData<T>): void {
-        if(msgData.data instanceof Blob || msgData.data instanceof Buffer || msgData.data instanceof ArrayBuffer) {
-            this.socket.send(msgData.data);
+        const msgTypeValue = utils.getType(msgData.data);
+        if(msgTypeValue === "[object Blob]" || msgTypeValue === "[object Buffer]" || msgTypeValue === "[object ArrayBuffer]") {
+            this.socket.send(<any>msgData.data);
         } else {
             if(utils.isEmpty(msgData.msgId)) {
                 msgData.msgId = utils.guid();
@@ -71,6 +73,13 @@ export class SocketClient<T={}> {
                 this.send(msgData);
             }
         });
+    }
+    private createSocket(connectionString: string):any {
+        try{
+            return new WebSocket(connectionString);
+        } catch {
+            return new (require("ws"))(connectionString);
+        }
     }
     private onClose(): void {
         this.callPlugin("onClose");

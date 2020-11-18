@@ -2,7 +2,7 @@ import { IncomingMessage } from "http";
 import { CommonUtils } from "../utils/CommonUtils";
 import {
     TypePluginLifeCycle,
-    TypeSocketEvent,
+    TypeServerSocketEvent,
     TypeMsgData
 } from "./IServerSocket";
 import fs from "fs";
@@ -12,7 +12,8 @@ type TypeServerSorketOptions = {
     onClose?: Function;
     plugin?: any[];
     id: string;
-    request: IncomingMessage
+    request: IncomingMessage;
+    sendToAll: Function;
 };
 
 type TypeSendFileInfo = {
@@ -49,7 +50,7 @@ export class ServerSocket extends CommonUtils {
             console.error(e);
         }
     }
-    send(msg:TypeMsgData): void {
+    send<T={}>(msg:TypeMsgData<T>): void {
         if(this.isArray(msg.data) || this.isObject(msg.data) ||this.isString(msg.data) || this.isNumeric(msg.data)) {
             if(this.isEmpty(msg.msgId)) {
                 msg.msgId = this.guid();
@@ -59,7 +60,7 @@ export class ServerSocket extends CommonUtils {
             this.socket.send(<any>msg.data);
         }
     }
-    sendAsync(msgData: TypeMsgData): Promise<any> {
+    sendAsync<T={}>(msgData: TypeMsgData<T>): Promise<any> {
         return new Promise<any>((resolve, reject)=> {
             msgData.msgId = this.guid();
             this.msgListeners[msgData.msgId] = {
@@ -68,6 +69,14 @@ export class ServerSocket extends CommonUtils {
             };
             this.send(msgData);
         });
+    }
+    /**
+     * 发送消息给所有客户端
+     * @param msgData 发送消息数据
+     * @param ignoreList 不需要发送的客户端id列表
+     */
+    sendToAll<T={}>(msgData:TypeMsgData<T>, ignoreList?: string[]): void {
+        this?.options?.sendToAll(msgData, ignoreList);
     }
     sendFile(fileName: string, timeout: number = 30000): Promise<any> {
         return new Promise<any>((resolve, reject) => {
@@ -132,7 +141,7 @@ export class ServerSocket extends CommonUtils {
             }
         });
     }
-    private sendFileBuffer(fileData: TypeSendFileInfo, timeout: number = 30000): Promise<any> {
+    sendFileBuffer(fileData: TypeSendFileInfo, timeout: number = 30000): Promise<any> {
         const now = new Date();
         return new Promise<any>((resolve, reject) => {
             if(!this.sendFileTime || now.getTime() - this.sendFileTime.getTime() > timeout) {
@@ -181,10 +190,11 @@ export class ServerSocket extends CommonUtils {
         if(plugin) {
             for(const _obj of plugin) {
                 if(typeof _obj[callbackName] === "function") {
-                    const event:TypeSocketEvent = {
+                    const event:TypeServerSocketEvent = {
                         argvs: args,
                         break: false,
                         socket: this,
+                        sendToAll: this.sendToAll.bind(this),
                         uid: this.options.id,
                         data: args[0]
                     };
@@ -242,7 +252,7 @@ export class ServerSocket extends CommonUtils {
         }
         this.send({
             msgType: "Connected",
-            data: "Welcome to use Websocket in your project"
+            data: this?.options?.id
         });
     }
 }

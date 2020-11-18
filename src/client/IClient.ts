@@ -17,8 +17,8 @@ export type TypeReceiveFileEvent = {
     fileData: Blob;
 };
 
-export default abstract class WebsocketPlugin {
-    socket: SocketClient;
+export default abstract class WebsocketPlugin<T={}> {
+    socket: SocketClient<T>;
     /**
      * 连接断开事件
      */

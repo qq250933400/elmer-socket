@@ -3,7 +3,7 @@ import { Server as WebSocketServer } from "ws";
 import { CommonUtils } from "../utils/CommonUtils";
 import Config, { getHost, getPort } from "./config";
 import { ServerSocket } from "./ServerSocket";
-import { TypeWebsocketConfig } from "./IServerSocket";
+import { TypeMsgData, TypeWebsocketConfig } from "./IServerSocket";
 
 @Config
 export class SocketServer extends CommonUtils{
@@ -16,19 +16,23 @@ export class SocketServer extends CommonUtils{
     @getPort()
     private port:number;
 
+    private initHost?: string;
+    private initPort?: number;
     /**
      * 
      * @param {object[]} plugin 自定义业务处理插件, 引入插件需要创建实例化对象
      */
-    constructor(plugin?:any[]) {
+    constructor(plugin?:any[], host?: string, port?: number) {
         super();
+        this.initHost = host;
+        this.initPort = port;
         if(this.isArray(plugin)) {
             this.plugins.splice(this.plugins.length, 0, ...plugin);
         }
     }
     listen(): void {
-        const host = this.host || "localhost";
-        const port = this.port || 3000;
+        const host = this.initHost || this.host || "localhost";
+        const port = this.initPort || this.port || 3000;
         const ioServer = new WebSocketServer({
             port,
             host
@@ -49,6 +53,45 @@ export class SocketServer extends CommonUtils{
         });
         this.log(`Websocket server is runing at ${host}:${port}`, "SUCCESS");
     }
+    /**
+     * 发送消息给所有客户端
+     * @param msgData 发送消息数据
+     * @param ignoreList 不需要发送的客户端id列表
+     */
+    sendToAll<T={}>(msgData: TypeMsgData<T>, ignoreList?: string[]): void {
+        if(this.connections) {
+            Object.keys(this.connections).map((clientKey: string) => {
+                if(this.isArray(ignoreList) && ignoreList.length>0) {
+                    if(ignoreList.indexOf(clientKey)<0) {
+                        (<ServerSocket>this.connections[clientKey]).send(msgData);
+                    }
+                } else {
+                    (<ServerSocket>this.connections[clientKey]).send(msgData);
+                }
+            });
+        }
+    }
+    sendTo<T={}>(msgData: TypeMsgData<T>, uid: string): void {
+        if(this.connections && this.connections[uid]) {
+            (<ServerSocket>this.connections[uid]).send(msgData);
+        }
+    }
+    sendToAsync<T={}>(msgData: TypeMsgData<T>, uid: string): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            if(this.connections && this.connections[uid]) {
+                (<ServerSocket>this.connections[uid]).sendAsync(msgData).then((resp) => {
+                    resolve(resp);
+                }).catch((err) => {
+                    reject(err);
+                });
+            } else {
+                reject({
+                    statusCode: "SOCKET_NOTFOUND",
+                    message: "target socket client not exists"
+                });
+            }
+        });
+    }
     private onSocketConnection(socket: WebSocket, req:IncomingMessage): void {
         // const ip = req.headers['x-forwarded-for'].split(/\s*,\s*/)[0];
         const uid = this.guid();
@@ -57,6 +100,7 @@ export class SocketServer extends CommonUtils{
             id: uid,
             plugin: this.plugins,
             request: req,
+            sendToAll: this.sendToAll.bind(this),
             onClose: (_id: string) => {
                 this.connections[_id] = null;
                 delete this.connections[_id];

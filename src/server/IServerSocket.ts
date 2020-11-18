@@ -10,7 +10,7 @@ export type TypePluginLifeCycle = "onMessage"|"onConnection"|"onClose"|"onError"
 
 
 export type TypeMsgData<T={}> = {
-    data: string|object|number|Array<{}>|ArrayBuffer|SharedArrayBuffer|Blob|ArrayBufferView;
+    data?: string|object|number|Array<{}>|ArrayBuffer|SharedArrayBuffer|Blob|ArrayBufferView;
     msgId?: string;
     msgType: TypeBaseMsgType | T;
     shouldBack?: boolean;
@@ -25,4 +25,8 @@ export type TypeSocketEvent<T = {}> = {
     socket: ServerSocket;
     uid: string;
     data: TypeMsgData<T>;
+};
+
+export type TypeServerSocketEvent = TypeSocketEvent & {
+    sendToAll<T={}>(msgData:TypeMsgData<T>, ignoreList?: string[]):void;
 };
