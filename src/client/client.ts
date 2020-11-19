@@ -88,15 +88,14 @@ export class SocketClient<T={}> {
     }
     private onClose(): void {
         this.callPlugin("onClose");
-        if(!this.retryHandler) {
-            this.retryHandler = setInterval(() => {
-                console.log(`Try reconnecting to the server [ws://${this?.options?.host}:${this?.options?.port}]`);
-                this.connection(this.options);
-            }, 1000);
-        }
     }
     private onError(err:any): void {
-        this.callPlugin("onError", err);
+        if(this.socket.readyState === 2 || this.socket.readyState === 3) {
+            console.log(`Try reconnecting to the server [ws://${this?.options?.host}:${this?.options?.port}]`);
+            this.connection(this.options);
+        } else {
+            this.callPlugin("onError", err);
+        }
     }
     private onConnected(): void {
         this.callPlugin("onConnected");
