@@ -1,6 +1,6 @@
 import ClientReceiveFile from "./ClientReceiveFile";
-import { TypeMsgData } from "../server/IServerSocket";
-import { StaticCommon as utils } from "elmer-common";
+import { TypeFileSendProgress, TypeMsgData, TypePluginLifeCycle } from "../server/IServerSocket";
+import { StaticCommon as utils, Common} from "elmer-common";
 
 type TypeSocketClientOption = {
     host: string;
@@ -9,15 +9,14 @@ type TypeSocketClientOption = {
     canRetryConnect?: boolean;
 };
 
-type PluginLifeCycle = "onClose" | "onError" | "onConnected" | "onMessage" | "onStartReceiveFile" | "onEndReceiveFile";
-
-export class SocketClient<T={}> {
+export class SocketClient<T={}> extends Common {
     options: TypeSocketClientOption;
     socket: WebSocket;
     fileObj: ClientReceiveFile;
     msgListener: any = {};
     private retryHandler: any;
     constructor(option: TypeSocketClientOption) {
+        super();
         this.options = option;
         this.connection(option);
     }
@@ -29,9 +28,20 @@ export class SocketClient<T={}> {
             this.socket.onopen = this.onConnected.bind(this);
             this.socket.onerror = this.onError.bind(this);
             this.socket.onclose = this.onClose.bind(this);
-            this.fileObj = new ClientReceiveFile(this.socket);
+            this.fileObj = new ClientReceiveFile(this.socket, {
+                sendTo: (msgData: TypeMsgData, toUser: string[]) => {
+                    msgData.toUser = toUser;
+                },
+                send: (msgData: TypeMsgData):void => {
+                    this.send(<any>msgData);
+                },
+                sendAsync: (msgData: TypeMsgData, timeout: number = 30000) => {
+                    return this.sendAsync(<any>msgData, timeout);
+                }
+            });
             this.fileObj.on("Start", this.onStartReceiveFile.bind(this));
             this.fileObj.on("End", this.onEndReceiveFile.bind(this));
+            this.fileObj.on("Progress", this.onReceivePropress.bind(this));
             this.initPlugin();
         } catch(e) {
             this.onError(e);
@@ -39,7 +49,7 @@ export class SocketClient<T={}> {
     }
     send(msgData: TypeMsgData<T>): void {
         const msgTypeValue = utils.getType(msgData.data);
-        if(msgTypeValue === "[object Blob]" || msgTypeValue === "[object Buffer]" || msgTypeValue === "[object ArrayBuffer]") {
+        if(msgTypeValue === "[object Blob]" || msgTypeValue === "[object Buffer]" || msgTypeValue==="[object Uint8Array]" || msgTypeValue === "[object ArrayBuffer]") {
             this.socket.send(<any>msgData.data);
         } else {
             if(utils.isEmpty(msgData.msgId)) {
@@ -55,12 +65,7 @@ export class SocketClient<T={}> {
         return new Promise((resolve, reject) => {
             const msgId = utils.guid();
             msgData.msgId = msgId;
-            if(!msgData.shouldBack || utils.isEmpty(msgData.backMsgType)) {
-                reject({
-                    statusCode: "MISSING_DATA",
-                    message: "To send a message in sendAsync mode, shouldBack must be true and backMsgType cannot be empty"
-                });
-            } else {
+            const timHandler = (() => {
                 const timeHandler = setInterval(() => {
                     reject({
                         statusCode: "TIMEOUT",
@@ -69,14 +74,16 @@ export class SocketClient<T={}> {
                     clearInterval(timeHandler);
                     delete this.msgListener[msgId];
                 }, timeout);
-                (<any>msgData.backMsgType) = "Promise_" + msgData.backMsgType;
-                this.msgListener[msgId] = {
-                    timeHandler,
-                    resolve,
-                    reject
-                };
-                this.send(msgData);
-            }
+                return timeHandler;
+            })();
+            (<any>msgData.backMsgType) = "Promise_" + msgData.msgType;
+            msgData.shouldBack = true;
+            this.msgListener[msgId] = {
+                timeHandler: timHandler,
+                resolve,
+                reject
+            };
+            this.send(msgData);
         });
     }
     private createSocket(connectionString: string):any {
@@ -106,7 +113,10 @@ export class SocketClient<T={}> {
     private onMessage(evt:MessageEvent): void {
         if(typeof evt.data === "string" && evt.data.length > 0) {
             const msgData:TypeMsgData = JSON.parse(evt.data);
-            if(!this.fileObj.onReceiveMessage(msgData)) {
+            if(!this.fileObj.onReceiveMessage(msgData, {
+                clientSide: false,
+                toUser: msgData.toUser
+            })) {
                 if(msgData.msgType === "Connected") {
                     this.callPlugin("onConnected", msgData);
                 } else {
@@ -115,7 +125,11 @@ export class SocketClient<T={}> {
                         const listener = this.msgListener[msgData.msgId as string];
                         if(listener) {
                             clearTimeout(listener.timeHandler);
-                            listener.resolve(msgData.data);
+                            if(msgData.backFailResult) {
+                                listener.reject(msgData);
+                            } else {
+                                listener.resolve(msgData);
+                            }
                             delete this.msgListener[msgData.msgId as string];
                         } else {
                             this.callPlugin("onMessage", msgData);
@@ -126,10 +140,14 @@ export class SocketClient<T={}> {
                 }
             }
         } else {
-            console.log(utils.getType(evt.data));
-            if(utils.getType(evt.data) === "[object Blob]") {
+            const dataType = utils.getType(evt.data);
+            console.log("Client", dataType);
+            if(dataType === "[object Blob]") {
                 this.fileObj.onReceiveBlob(evt.data);
-            } else if(utils.getType(evt.data) === "[object Buffer]") {
+            } else if(dataType === "[object Buffer]") {
+                this.fileObj.onReceiveBuffer(evt.data);
+            } else if(dataType === "[object Uint8Array]"){
+                console.log("File_DATA");
                 this.fileObj.onReceiveBuffer(evt.data);
             } else {
                 // tslint:disable-next-line: no-console
@@ -147,7 +165,10 @@ export class SocketClient<T={}> {
     private onEndReceiveFile(msgData:any): void {
         this.callPlugin("onEndReceiveFile", msgData);
     }
-    private callPlugin(name: PluginLifeCycle, ...arg:any[]): void {
+    private onReceivePropress(fileData: TypeFileSendProgress): void {
+        this.callPlugin("onSendFileProgress", fileData);
+    }
+    private callPlugin(name: TypePluginLifeCycle, ...arg:any[]): void {
         this.options?.plugin?.map((plugin:any) => {
             typeof plugin[name] === "function" && plugin[name].apply(plugin, arg);
         });

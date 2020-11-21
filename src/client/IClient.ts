@@ -1,5 +1,5 @@
 import { SocketClient } from "./client";
-import { TypeMsgData } from "../server/IServerSocket";
+import { TypeEndSendFileEvent, TypeFileSendProgress, TypeMsgData, TypeStartSendFileEvent } from "../server/IServerSocket";
 
 export const SendFileTypes = {
     processing: "SendFileProcessing",
@@ -32,12 +32,13 @@ export default abstract class WebsocketPlugin<T={}> {
      * 连接服务端成功事件
      * @param msgData 消息数据
      */
-    onConnected?(msgData: TypeMsgData):void;
+    onConnected?(msgData: TypeMsgData<T>):void;
     /**
      * 接收到消息事件
      * @param msgData 消息数据
      */
-    onMessage?(msgData: TypeMsgData): void;
-    onStartReceiveFile?(data: {[P in Exclude<keyof TypeReceiveFileEvent, "fileData">]: TypeReceiveFileEvent[P]}):void;
-    onEndReceiveFile?(data: TypeReceiveFileEvent):void;
+    onMessage?(msgData: TypeMsgData<T>): void;
+    onStartReceiveFile?(data: TypeStartSendFileEvent): void;
+    onEndReceiveFile?(data: TypeEndSendFileEvent): void;
+    onSendFileProgress?(data: TypeFileSendProgress): void;
 }

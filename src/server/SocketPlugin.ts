@@ -1,4 +1,4 @@
-import { TypeMsgData, TypeServerSocketEvent } from "./IServerSocket";
+import { TypeEndSendFileEvent, TypeFileSendProgress, TypeMsgData, TypeServerSocketEvent, TypeStartSendFileEvent } from "./IServerSocket";
 import { CommonUtils } from "../utils/CommonUtils";
 import { IncomingMessage } from "http";
 
@@ -10,7 +10,10 @@ export default abstract class SocketPlugin<T={}> extends CommonUtils {
      * @param msgEvent 原始消息事件对象
      */
     onMessage?(event: TypeServerSocketEvent<T>, msgData: TypeMsgData, msgEvent: MessageEvent):void;
-    onConnection?(event: TypeServerSocketEvent<T>, invMsg: IncomingMessage): void;
+    onConnected?(event: TypeServerSocketEvent<T>, invMsg: IncomingMessage): void;
     onClose?(event: TypeServerSocketEvent<T>, uid: string): void;
     onError?(event: TypeServerSocketEvent<T>, error:any): void;
+    onStartReceiveFile?(data: TypeStartSendFileEvent): void;
+    onEndReceiveFile?(data: TypeEndSendFileEvent): void;
+    onSendFileProgress?(data: TypeFileSendProgress): void;
 }

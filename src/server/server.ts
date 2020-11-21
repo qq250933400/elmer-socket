@@ -4,6 +4,7 @@ import { CommonUtils } from "../utils/CommonUtils";
 import Config, { getHost, getPort } from "./config";
 import { ServerSocket } from "./ServerSocket";
 import { TypeMsgData, TypeWebsocketConfig } from "./IServerSocket";
+import { queueCallFunc, TypeQueueCallParam } from "elmer-common";
 
 @Config
 export class SocketServer extends CommonUtils{
@@ -101,6 +102,40 @@ export class SocketServer extends CommonUtils{
             plugin: this.plugins,
             request: req,
             sendToAll: this.sendToAll.bind(this),
+            sendTo: (msgData: TypeMsgData, toList: string[]) => {
+                if(toList && toList.length > 0) {
+                    toList.map((toUID) => {
+                        this.sendTo(msgData, toUID);
+                    });
+                } else {
+                    throw new Error("ToList can not be empty");
+                }
+            },
+            sendToAsync: (msgData: TypeMsgData, toList: string[]): Promise<any> => {
+                const params: TypeQueueCallParam[] = [];
+                return new Promise<any>((resolve, reject) => {
+                    if(toList && toList.length > 0) {
+                        toList.map((toUID: string) => {
+                            params.push({
+                                id: toUID,
+                                params: toUID
+                            });
+                        });
+                        queueCallFunc(params, ({}, params) => {
+                            return this.sendToAsync(msgData, params);
+                        }).then((data) => {
+                            resolve(data);
+                        }).catch((err) => {
+                            reject(err);
+                        })
+                    } else {
+                        reject({
+                            statusCode: "T_TO_LIST_404",
+                            message: "toList is required, but no data found in arguments"
+                        });
+                    }
+                });
+            },
             onClose: (_id: string) => {
                 this.connections[_id] = null;
                 delete this.connections[_id];
