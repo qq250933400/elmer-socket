@@ -358,13 +358,23 @@ export default class ClientReceiveFile extends CommonUtils {
                 if(this.isEmpty(packageData.info.toUser)) {
                     // 保存文件到本地，判断是否完成文件传输
                     const fileId = packageData.info.id;
+                    const fileIndex = packageData.info.index;
                     const saveFileInfo = this.reciveFileData[fileId];
-                    const saveFileData = saveFileInfo["fileData"] || {};
                     const allFileLength:number = this.reciveFileData[fileId]["fileLength"];
                     let saveLength = 0;
+                    this.reciveFileData[fileId]["fileData"][fileIndex] = packageData.data;
+                    // 读取所有数据做判断
+                    const saveFileData = saveFileInfo["fileData"] || {};
                     Object.keys(saveFileData).map((sIndex) => {
-                        if(!isNaN(saveFileData[sIndex].size)) {
-                            saveLength += saveFileData[sIndex].size;
+                        const fType = this.getType(saveFileData[sIndex]);
+                        if(isNode) {
+                            if(fType === "[object Blob]" || fType === "[object Uint8Array]") {
+                                saveLength += (saveFileData[sIndex] as Blob).size;
+                            }
+                        } else {
+                            if(fType === "[object Buffer]" || fType === "[object Uint8Array]") {
+                                saveLength += (saveFileData[sIndex] as Buffer).length;
+                            }
                         }
                     });
                     if(saveLength >= allFileLength) {
