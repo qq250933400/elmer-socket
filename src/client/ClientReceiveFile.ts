@@ -336,11 +336,16 @@ export default class ClientReceiveFile extends CommonUtils {
             }
             return true;
         } else if(msgData.msgType === "SendFileComplete") {
-            // 文件发送结束，清除记录
-            if(msgData.backFailResult) {
-                this.sendFileReject(msgData.data);
+            if(this.isArray(msgData.toUser) && msgData.toUser.length > 0) {
+                // toUser不是空标识需要做转发
+                this.options.sendTo(msgData, msgData.toUser);
             } else {
-                this.sendFileResolve(msgData.data);
+                // 文件发送结束，清除记录
+                if(msgData.backFailResult) {
+                    this.sendFileReject(msgData.data);
+                } else {
+                    this.sendFileResolve(msgData.data);
+                }
             }
             return true;
         } else {
@@ -400,7 +405,7 @@ export default class ClientReceiveFile extends CommonUtils {
                             msgId: this.guid(),
                             data: fileId,
                             from: option.from,
-                            toUser: packageData.info.from || ""
+                            toUser: !this.isEmpty(packageData.info.from) ? [packageData.info.from] : null
                         }));
                         this.callListener("End", {
                             ...fileAllData,
@@ -444,7 +449,7 @@ export default class ClientReceiveFile extends CommonUtils {
     }
     private getFileType(fileType: string): string {
         const fType:any = /^\./.test(fileType) ? fileType : "." + fileType;
-        return this.getValue(fileTypes, fType) || "*.*";
+        return (fileTypes as any)[fType] || "*.*";
     }
     private callListener(eventName: TypeReceiveFileEventName, ...arg:any[]): void {
         const listener = this.eventListener[eventName];
