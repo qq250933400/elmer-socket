@@ -159,7 +159,7 @@ export class CommonUtils extends Common {
                         (lenBlob as any).arrayBuffer().then((lenBuffer:ArrayBuffer) => {
                             const mData = new DataView(lenBuffer, 0);
                             const lenValue = mData.getUint16(0);
-                            const infoData = data.slice(data.size - lenValue - 5);
+                            const infoData = data.slice(data.size - lenValue - 5, data.size - 5);
                             (infoData as any).text().then((jsonData: string) => {
                                 _resolve({
                                     info: JSON.parse(jsonData),
