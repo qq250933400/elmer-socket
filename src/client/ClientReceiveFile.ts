@@ -280,11 +280,11 @@ export default class ClientReceiveFile extends CommonUtils {
             }
         });
     }
-    onReceiveBlob(blobData:Blob): void {
-        this.receiveBinaryData(blobData);
+    onReceiveBlob(blobData:Blob,option: TypeReceiveFileMessageOptions): void {
+        this.receiveBinaryData(blobData, option);
     }
-    onReceiveBuffer(data:Buffer): void {
-        this.receiveBinaryData(data);
+    onReceiveBuffer(data:Buffer, option: TypeReceiveFileMessageOptions): void {
+        this.receiveBinaryData(data, option);
     }
     onReceiveMessage(msgData: TypeMsgData, option: TypeReceiveFileMessageOptions): boolean {
         if(msgData.msgType === "SendFileProcessing") {
@@ -351,7 +351,7 @@ export default class ClientReceiveFile extends CommonUtils {
      * 接收到二进制数据，判断运行环境，调用对应的方法解析数据结构
      * @param data 二进制数据包
      */
-    private receiveBinaryData(data: Blob|Buffer): void {
+    private receiveBinaryData(data: Blob|Buffer, option: TypeReceiveFileMessageOptions): void {
         const isNode = this.isNode();
         this.decodeMsgPackage(data, isNode, SEND_FILE_PACKAGE_TAG)
             .then((packageData: TypeMsgPackage) => {
@@ -367,7 +367,7 @@ export default class ClientReceiveFile extends CommonUtils {
                     const saveFileData = saveFileInfo["fileData"] || {};
                     Object.keys(saveFileData).map((sIndex) => {
                         const fType = this.getType(saveFileData[sIndex]);
-                        if(isNode) {
+                        if(!isNode) {
                             if(fType === "[object Blob]" || fType === "[object Uint8Array]") {
                                 saveLength += (saveFileData[sIndex] as Blob).size;
                             }
@@ -398,7 +398,9 @@ export default class ClientReceiveFile extends CommonUtils {
                         this.socket.send(JSON.stringify({
                             msgType: SendFileTypes.complete,
                             msgId: this.guid(),
-                            data: fileId
+                            data: fileId,
+                            from: option.from,
+                            toUser: packageData.info.from || ""
                         }));
                         this.callListener("End", {
                             ...fileAllData,
@@ -429,6 +431,7 @@ export default class ClientReceiveFile extends CommonUtils {
                     const infoData = packageData.info;
                     const fileData = packageData.data;
                     infoData.toUser = "";
+                    infoData.from = option.from;
                     const sendData = this.encodeMsgPackage(fileData, infoData, isNode, SEND_FILE_PACKAGE_TAG);
                     this.options.sendTo({
                         msgType: "SendFileResp",

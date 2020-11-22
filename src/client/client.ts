@@ -141,14 +141,22 @@ export class SocketClient<T={}> extends Common {
             }
         } else {
             const dataType = utils.getType(evt.data);
-            console.log("Client", dataType);
             if(dataType === "[object Blob]") {
-                this.fileObj.onReceiveBlob(evt.data);
+                this.fileObj.onReceiveBlob(evt.data, {
+                    clientSide: true,
+                    from: ""
+                });
             } else if(dataType === "[object Buffer]") {
-                this.fileObj.onReceiveBuffer(evt.data);
+                this.fileObj.onReceiveBuffer(evt.data, {
+                    clientSide: true,
+                    from: ""
+                });
             } else if(dataType === "[object Uint8Array]"){
                 console.log("File_DATA");
-                this.fileObj.onReceiveBuffer(evt.data);
+                this.fileObj.onReceiveBuffer(evt.data, {
+                    clientSide: true,
+                    from: ""
+                });
             } else {
                 // tslint:disable-next-line: no-console
                 console.log("Not Support Data", evt.data);

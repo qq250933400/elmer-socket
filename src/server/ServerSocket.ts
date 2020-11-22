@@ -162,13 +162,21 @@ export class ServerSocket extends CommonUtils {
                         }
                     }
                 } else {
-                    console.log("Server: ", msgDataType);
                     if(msgDataType === "[object Buffer]") {
-                        this.fileObj.onReceiveBuffer(msgEvt.data);
+                        this.fileObj.onReceiveBuffer(msgEvt.data,{
+                            clientSide: false,
+                            from: this.options?.id
+                        });
                     } else if(msgDataType === "[object Uint8Array]") {
-                        this.fileObj.onReceiveBuffer(msgEvt.data);
+                        this.fileObj.onReceiveBuffer(msgEvt.data,{
+                            clientSide: false,
+                            from: this.options?.id
+                        });
                     } else if(this.getType(msgEvt.data) === "[object Blob]") {
-                        this.fileObj.onReceiveBlob(msgEvt.data);
+                        this.fileObj.onReceiveBlob(msgEvt.data,{
+                            clientSide: false,
+                            from: this.options?.id
+                        });
                     } else {
                         this.callPluginMethod("onMessage", msgEvt);
                     }
