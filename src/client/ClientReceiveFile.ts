@@ -1,7 +1,8 @@
-import { Common, queueCallFunc, TypeQueueCallParam } from "elmer-common";
+import { queueCallFunc, TypeQueueCallParam } from "elmer-common";
 import fileTypes from "./fileTypes";
 import { SendFileTypes } from "./IClient";
 import { TypeMsgData, TypeSendFileInfo } from "../server/IServerSocket";
+import { CommonUtils, TypeMsgPackage } from "../utils/CommonUtils";
 
 type TypeReceiveFileEventName = "Start" | "End" | "Progress";
 type TypeSocketEventOptions = {
@@ -19,7 +20,9 @@ type TypeReceiveFileMessageOptions = {
     clientSide: boolean;
 };
 
-export default class ClientReceiveFile extends Common {
+const SEND_FILE_PACKAGE_TAG = "WSF";
+
+export default class ClientReceiveFile extends CommonUtils {
     private reciveFileData: any = {};
     private socket:WebSocket;
     private eventListener:any = {};
@@ -132,7 +135,6 @@ export default class ClientReceiveFile extends Common {
                         message: "timeout no reponse from client"
                     });
                 } else {
-                    console.log("SendBuffer: ",this.getType(fileData.fileData));
                     this.options.sendAsync({
                         msgType: "SendFileProcessing",
                         data: {
@@ -147,24 +149,12 @@ export default class ClientReceiveFile extends Common {
                     }).then((myMsgData: TypeMsgData) => {
                         try{
                             const respData: any = myMsgData.data;
-                            console.log(myMsgData);
                             const msgData = {
                                 index: respData.index,
                                 id: respData.id,
                                 toUser: myMsgData.toUser ? myMsgData.toUser : myMsgData.from
                             };
-                            const infoBuffer = Buffer.from(JSON.stringify(msgData)); // 文件信息
-                            const infoLength = infoBuffer.length;
-                            const newData = Buffer.alloc(fileData.fileData.length + infoBuffer.length + 2);
-                            fileData.fileData.copy(newData, 0,0);
-                            infoBuffer.copy(newData, fileData.fileData.length, 0);
-
-                            // 将文件信息字节长度写入Buffer最后两个字节, 
-                            // 将info字节长度值转成字符在写入最后两个字节，方便在前端读取
-                            const lenArrayBuffer = new Uint16Array([infoLength]);
-                            const lenBuffer = Buffer.alloc(2);
-                            Buffer.from(lenArrayBuffer).copy(newData, newData.length -2);
-                            newData.copy(lenBuffer, 0, newData.length - 2);
+                            const newData = this.encodeMsgPackage(fileData.fileData, msgData, this.isNode(), SEND_FILE_PACKAGE_TAG);
                             this.options.send({
                                 msgType: "SendFileResp",
                                 data: newData
@@ -278,14 +268,7 @@ export default class ClientReceiveFile extends Common {
                         id: respData.id,
                         toUser: myMsgData.toUser ? myMsgData.toUser[0] : myMsgData.from
                     };
-                    // 将文件信息字节长度写入Buffer最后两个字节, 
-                    // 将info字节长度值转成字符在写入最后两个字节，方便在前端读取
-                    const infoBlob = new Blob([JSON.stringify(msgData)], {
-                        type: "application/json"
-                    });
-                    const infoLength = infoBlob.size;
-                    const sizeBlob = new Uint16Array([infoLength]);
-                    const newData = new Blob([fileData.fileData, infoBlob, sizeBlob]);
+                    const newData = this.encodeMsgPackage(fileData.fileData, msgData, this.isNode(), SEND_FILE_PACKAGE_TAG);
                     this.options.send({
                         msgType: "SendFileResp",
                         data: newData
@@ -298,265 +281,10 @@ export default class ClientReceiveFile extends Common {
         });
     }
     onReceiveBlob(blobData:Blob): void {
-        const sizeBlob = blobData.slice(blobData.size - 2);
-        queueCallFunc([
-            {
-                id: "readSizeBlob",
-                params: "",
-                fn: ():any => {
-                    return new Promise<any>((resolve,reject) => {
-                        const file = new FileReader();
-                        file.onload = (res:any) => {
-                            const infoLen = parseInt(<string>res.target.result, 10);
-                            resolve(infoLen);
-                        };
-                        file.onerror = (err) => {
-                            reject(err);
-                        };
-                        file.readAsBinaryString(sizeBlob);
-                    });
-                }
-            }, {
-                id: "readInfo",
-                params: "",
-                fn: (option):any => {
-                    return new Promise<any>((resolve, reject) => {
-                        const infoBlob = blobData.slice(blobData.size - option.lastResult - 2, blobData.size - 2);
-                        const infoReader = new FileReader();
-                        infoReader.onload = (res:any) => {
-                            resolve({
-                                info: JSON.parse(<string>res.target.result),
-                                data: blobData.slice(0, blobData.size - option.lastResult - 2)
-                            });
-                        };
-                        infoReader.onerror = (err) => {
-                            reject(err);
-                        };
-                        infoReader.readAsText(infoBlob);
-                    });
-                }
-            }, {
-                id: "saveFileBlob",
-                params: "",
-                fn:(option): any => {
-                    return new Promise<any>((resolve) => {
-                        const infoData = option.lastResult.info;
-                        const fileData:Blob = option.lastResult.data;
-                        const toUser = infoData.toUser;
-                        let dResult = {
-                            proxy: false
-                        };
-                        if(!this.isEmpty(toUser)) {
-                            infoData.toUser = "";
-                            const infoBlob = new Blob(infoData, {type: "application/json"});
-                            const infoLength = infoBlob.size;
-                            const sizeBlob = new Uint16Array([infoLength]);
-                            const newData = new Blob([fileData, infoBlob, sizeBlob]);
-                            dResult.proxy = true;
-                            this.options.sendTo({
-                                msgType: "SendFileResp",
-                                data: newData
-                            }, [toUser]);
-                            // 转发数据
-                        } else {
-                            const fileId = infoData.id;
-                            const fileIndex = infoData.index;
-                            this.reciveFileData[fileId]["fileData"][fileIndex] = fileData;
-                        }
-                        resolve(dResult);
-                    });
-                }
-            }
-        ]).then((resp:any) => {
-            if(!resp.saveFileBlob.proxy) {
-                const fileId = resp.readInfo.info.id;
-                const saveFileInfo = this.reciveFileData[fileId];
-                const saveFileData = saveFileInfo["fileData"] || {};
-                const allFileLength:number = this.reciveFileData[fileId]["fileLength"];
-                let saveLength = 0;
-                Object.keys(saveFileData).map((sIndex) => {
-                    if(!isNaN(saveFileData[sIndex].size)) {
-                        saveLength += saveFileData[sIndex].size;
-                    }
-                });
-                if(saveLength >= allFileLength) {
-                    // 文件传输完成
-                    // 合并文件
-                    const fileAllData = this.reciveFileData[fileId];
-                    const fileBinaryData = fileAllData["fileData"];
-                    const allBlobData:Blob[] = [];
-                    const fileType = this.getFileType(fileAllData.fileType);
-                    Object.keys(fileBinaryData).map((fKey) => {
-                        allBlobData.push(fileBinaryData[fKey]);
-                    });
-                    const mergeData = new Blob(allBlobData, {type: fileType});
-                    this.socket.send(JSON.stringify({
-                        msgType: SendFileTypes.complete,
-                        msgId: this.guid(),
-                        data: fileId
-                    }));
-                    this.callListener("End", {
-                        ...fileAllData,
-                        fileData: mergeData,
-                        percent: "100%",
-                        total: allFileLength,
-                        loaded: saveLength
-                    });
-                    delete this.reciveFileData[fileId];
-                } else {
-                    this.socket.send(JSON.stringify({
-                        msgType: SendFileTypes.response,
-                        msgId: fileId,
-                        callback: true
-                    }));
-                    this.callListener("Progress", {
-                        fileId,
-                        fileName: saveFileInfo.fileName,
-                        fileType: saveFileInfo.fileType,
-                        percent: ((saveLength / allFileLength) * 100).toFixed(2) + "%",
-                        total: allFileLength,
-                        loaded: saveLength
-                    });
-                }
-            } else {
-                console.log("Blob data transfer", resp.readInfo.info);
-            }
-        }).catch((error:any) => {
-            // tslint:disable-next-line: no-console
-            console.error(error);
-            this.socket.send(JSON.stringify({
-                msgType: SendFileTypes.response,
-                msgId: "None",
-            }));
-        });
+        this.receiveBinaryData(blobData);
     }
     onReceiveBuffer(data:Buffer): void {
-        // tslint:disable-next-line: no-console
-        console.log("OnReciveBuffer", data);
-        const sizeBuffer = Buffer.alloc(2);
-        data.copy(sizeBuffer, 0, data.length - 2);
-        queueCallFunc([
-            {
-                id: "readSizeBlob",
-                params: "",
-                fn: ():any => {
-                    return new Promise<any>((resolve) => {
-                        resolve(sizeBuffer.readUInt16LE(0));
-                    });
-                }
-            }, {
-                id: "readInfo",
-                params: "",
-                fn: (option):any => {
-                    return new Promise<any>((resolve) => {
-                        const infoBuffer = Buffer.alloc(option.lastResult);
-                        const bodyBuffer = Buffer.alloc(data.length - option.lastResult - 2);
-                        data.copy(infoBuffer, 0, data.length - option.lastResult - 2);
-                        data.copy(bodyBuffer, 0, 0, bodyBuffer.length);
-                        resolve({
-                            info: JSON.parse(infoBuffer.toString()),
-                            data: bodyBuffer
-                        });
-                    });
-                }
-            }, {
-                id: "saveFileBlob",
-                params: "",
-                fn:(option): any => {
-                    return new Promise<any>((resolve) => {
-                        const infoData = option.lastResult.info;
-                        const fileData:Buffer = option.lastResult.data;
-                        const toUser = infoData.toUser;
-                        let dResult = {
-                            proxy: false
-                        };
-                        if(!this.isEmpty(toUser)) {
-                            infoData.toUser = "";
-                            const infoBuffer = Buffer.from(JSON.stringify(infoData));
-                            const lenBuffer = Buffer.alloc(2);
-                            const allLen = fileData.length + 2 + infoBuffer.length;
-                            const msgData = Buffer.alloc(allLen);
-                            lenBuffer.writeInt16BE(infoBuffer.length);
-                            fileData.copy(msgData, 0,0, fileData.length)
-                            infoBuffer.copy(msgData, fileData.length, 0);
-                            lenBuffer.copy(msgData, fileData.length + infoBuffer.length, 0);
-                            dResult.proxy = true;
-                            this.options.sendTo({
-                                msgType: "SendFileResp",
-                                data: msgData
-                            }, [toUser]);
-                            // 转发数据
-                        } else {
-                            const fileId = infoData.id;
-                            const fileIndex = infoData.index;
-                            this.reciveFileData[fileId]["fileData"][fileIndex] = fileData;
-                        }
-                        resolve(dResult);
-                    });
-                }
-            }
-        ]).then((resp:any) => {
-            if(!resp.saveFileBlob.proxy) {
-                const fileId = resp.readInfo.info.id;
-                const saveFileInfo = this.reciveFileData[fileId];
-                const saveFileData = saveFileInfo["fileData"] || {};
-                const allFileLength:number = this.reciveFileData[fileId]["fileLength"];
-                let saveLength = 0;
-                Object.keys(saveFileData).map((sIndex) => {
-                    if(!isNaN(saveFileData[sIndex].size)) {
-                        saveLength += saveFileData[sIndex].size;
-                    }
-                });
-                if(saveLength >= allFileLength) {
-                    // 文件传输完成
-                    // 合并文件
-                    const fileAllData = this.reciveFileData[fileId];
-                    const fileBinaryData = fileAllData["fileData"];
-                    const allBlobData:Blob[] = [];
-                    const fileType = this.getFileType(fileAllData.fileType);
-                    Object.keys(fileBinaryData).map((fKey) => {
-                        allBlobData.push(fileBinaryData[fKey]);
-                    });
-                    const mergeData = new Blob(allBlobData, {type: fileType});
-                    this.socket.send(JSON.stringify({
-                        msgType: SendFileTypes.complete,
-                        msgId: this.guid(),
-                        data: fileId
-                    }));
-                    this.callListener("End", {
-                        ...fileAllData,
-                        fileData: mergeData,
-                        percent: "100%",
-                        total: allFileLength,
-                        loaded: saveLength
-                    });
-                    delete this.reciveFileData[fileId];
-                } else {
-                    this.socket.send(JSON.stringify({
-                        msgType: SendFileTypes.response,
-                        msgId: fileId,
-                        callback: true
-                    }));
-                    this.callListener("Progress", {
-                        fileId,
-                        fileName: saveFileInfo.fileName,
-                        fileType: saveFileInfo.fileType,
-                        percent: ((saveLength / allFileLength) * 100).toFixed(2) + "%",
-                        total: allFileLength,
-                        loaded: saveLength
-                    });
-                }
-            } else {
-                console.log("Binary Data Transfer", resp.readInfo.info);
-            }
-        }).catch((error:any) => {
-            // tslint:disable-next-line: no-console
-            console.error(error);
-            this.socket.send(JSON.stringify({
-                msgType: SendFileTypes.response,
-                msgId: "None",
-            }));
-        });
+        this.receiveBinaryData(data);
     }
     onReceiveMessage(msgData: TypeMsgData, option: TypeReceiveFileMessageOptions): boolean {
         if(msgData.msgType === "SendFileProcessing") {
@@ -601,10 +329,6 @@ export default class ClientReceiveFile extends Common {
                     // 在服务端接收到转发消息，toUser不为空时直接转发至客户端
                     // 将from设置为当前接入的socket id，这样在client端需要直接对话可以将from设置为toUser
                     msgData.from = option.from;
-                    console.log("------on server side -----------");
-                    console.log(toUser);
-                    console.log(option.from);
-                    console.log(msgData);
                     this.options.sendTo(msgData, toUser);
                 } else {
                     console.error("错误消息，当前消息转发至错误客户端", msgData);
@@ -622,6 +346,88 @@ export default class ClientReceiveFile extends Common {
         } else {
             return false;
         }
+    }
+    /**
+     * 接收到二进制数据，判断运行环境，调用对应的方法解析数据结构
+     * @param data 二进制数据包
+     */
+    private receiveBinaryData(data: Blob|Buffer): void {
+        const isNode = this.isNode();
+        this.decodeMsgPackage(data, isNode, SEND_FILE_PACKAGE_TAG)
+            .then((packageData: TypeMsgPackage) => {
+                if(this.isEmpty(packageData.info.toUser)) {
+                    // 保存文件到本地，判断是否完成文件传输
+                    const fileId = packageData.info.id;
+                    const saveFileInfo = this.reciveFileData[fileId];
+                    const saveFileData = saveFileInfo["fileData"] || {};
+                    const allFileLength:number = this.reciveFileData[fileId]["fileLength"];
+                    let saveLength = 0;
+                    Object.keys(saveFileData).map((sIndex) => {
+                        if(!isNaN(saveFileData[sIndex].size)) {
+                            saveLength += saveFileData[sIndex].size;
+                        }
+                    });
+                    if(saveLength >= allFileLength) {
+                        // 文件传输完成
+                        // 合并文件
+                        const fileAllData = this.reciveFileData[fileId];
+                        const fileBinaryData = fileAllData["fileData"];
+                        const allBinaryDataParts:any[] = [];
+                        let fileBinary: any;
+                        Object.keys(fileBinaryData).map((fKey) => {
+                            allBinaryDataParts.push(fileBinaryData[fKey]);
+                        });
+                        if(!isNode) {
+                            // Browser端，没有Buffer需要使用Blob来合并二进制数据
+                            const fileType = this.getFileType(fileAllData.fileType);
+                            fileBinary = new Blob(allBinaryDataParts, {type: fileType});
+                        } else {
+                            // NodeJs环境，只能使用Buffer合并数据
+                            fileBinary = Buffer.concat(allBinaryDataParts);
+                        }
+                        this.socket.send(JSON.stringify({
+                            msgType: SendFileTypes.complete,
+                            msgId: this.guid(),
+                            data: fileId
+                        }));
+                        this.callListener("End", {
+                            ...fileAllData,
+                            fileData: fileBinary,
+                            percent: "100%",
+                            total: allFileLength,
+                            loaded: saveLength
+                        });
+                        delete this.reciveFileData[fileId];
+                    } else {
+                        this.socket.send(JSON.stringify({
+                            msgType: SendFileTypes.response,
+                            msgId: fileId,
+                            callback: true
+                        }));
+                        this.callListener("Progress", {
+                            fileId,
+                            fileName: saveFileInfo.fileName,
+                            fileType: saveFileInfo.fileType,
+                            percent: ((saveLength / allFileLength) * 100).toFixed(2) + "%",
+                            total: allFileLength,
+                            loaded: saveLength
+                        });
+                    }
+                } else {
+                    // toUser不为空，表示当前数据需要做转发, 转发数据包到指定client, 删除toUser防止再次做转发陷入死循环
+                    const toUser = packageData.info.toUser;
+                    const infoData = packageData.info;
+                    const fileData = packageData.data;
+                    infoData.toUser = "";
+                    const sendData = this.encodeMsgPackage(fileData, infoData, isNode, SEND_FILE_PACKAGE_TAG);
+                    this.options.sendTo({
+                        msgType: "SendFileResp",
+                        data: sendData
+                    }, [toUser]);
+                }
+            }).catch((err:any) => {
+                console.error(err);
+            })
     }
     private getFileType(fileType: string): string {
         const fType:any = /^\./.test(fileType) ? fileType : "." + fileType;
