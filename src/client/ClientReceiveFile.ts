@@ -559,7 +559,6 @@ export default class ClientReceiveFile extends Common {
         });
     }
     onReceiveMessage(msgData: TypeMsgData, option: TypeReceiveFileMessageOptions): boolean {
-        console.log(option.clientSide, msgData);
         if(msgData.msgType === "SendFileProcessing") {
             const msgId = msgData.msgId;
             const msgIndex = (<any>msgData.data).index;

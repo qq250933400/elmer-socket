@@ -114,7 +114,7 @@ export class SocketClient<T={}> extends Common {
         if(typeof evt.data === "string" && evt.data.length > 0) {
             const msgData:TypeMsgData = JSON.parse(evt.data);
             if(!this.fileObj.onReceiveMessage(msgData, {
-                clientSide: false,
+                clientSide: true,
                 toUser: msgData.toUser
             })) {
                 if(msgData.msgType === "Connected") {
