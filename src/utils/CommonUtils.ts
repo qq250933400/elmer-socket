@@ -133,17 +133,17 @@ export class CommonUtils extends Common {
                         const tagData = data.slice(data.size - 3);
                         (tagData as any).text().then((dTag:string) => {
                             if(dTag !== tag) {
-                                reject({
+                                _reject({
                                     statusCode: "T_801",
                                     message: "tag not matched"
                                 });
                             } else {
-                                resolve({
+                                _resolve({
                                     pass: true
                                 });
                             }
                         }).catch((err:any) => {
-                            reject({
+                            _resolve({
                                 statusCode: "T_800",
                                 err
                             });
@@ -166,14 +166,14 @@ export class CommonUtils extends Common {
                                     data: data.slice(0, data.size - lenValue - 5)
                                 });
                             }).catch((_err:any) => {
-                                reject({
+                                _reject({
                                     statusCode: "T_803",
                                     message: _err.message,
                                     exception: _err
                                 });
                             });
                         }).catch((err:any) => {
-                            reject({
+                            _reject({
                                 statusCode: "T_802",
                                 err
                             });
