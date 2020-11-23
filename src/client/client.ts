@@ -70,6 +70,7 @@ export class SocketClient<T={}> extends Common {
             }
             this.socket.send(JSON.stringify(msgData));
         }
+        this.beatTimeCount = 0;
     }
     sendAsync(msgData: TypeMsgData<T>, timeout=30000): Promise<any> {
         return new Promise((resolve, reject) => {
@@ -167,6 +168,7 @@ export class SocketClient<T={}> extends Common {
         }
     }
     private onMessage(evt:MessageEvent): void {
+        this.beatTimeCount = 0; // 只要接收到服务端消息，则默认连接畅通，重置计时，只有未做任何数据传输的时候才做心跳包的检测
         if(typeof evt.data === "string" && evt.data.length > 0) {
             const msgData:TypeMsgData = JSON.parse(evt.data);
             if(!this.fileObj.onReceiveMessage(msgData, {
