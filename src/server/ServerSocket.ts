@@ -157,7 +157,16 @@ export class ServerSocket extends CommonUtils {
                                     this.callPluginMethod("onMessage", msgData, msgEvt);
                                 }
                             } else {
-                                this.callPluginMethod("onMessage", msgData, msgEvt);
+                                if(msgData.msgType === "Beat") {
+                                    // 心跳包检测
+                                    this.send({
+                                        msgType: msgData.backMsgType,
+                                        msgId: msgData.msgId,
+                                        data: "Welcome to use elmer-socket, auther: elmer s j mo, email: 250933400@qq.com."
+                                    });
+                                } else {
+                                    this.callPluginMethod("onMessage", msgData, msgEvt);
+                                }
                             }
                         }
                     }

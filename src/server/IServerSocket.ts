@@ -38,7 +38,7 @@ export type TypeSendFileInfo = {
 };
 
 
-export type TypeBaseMsgType = "Connected" | "Chat" | "SendFileProcessing" | "Promise_SendFileProcessing" | "SendFileEnd" | "SendFileResp"|"SendFileComplete";
+export type TypeBaseMsgType = "Connected" | "Beat" | "Chat" | "SendFileProcessing" | "Promise_SendFileProcessing" | "SendFileEnd" | "SendFileResp"|"SendFileComplete";
 export type TypePluginLifeCycle = "onClose" | "onError" | "onConnected" | "onMessage" | "onStartReceiveFile" | "onEndReceiveFile" | "onSendFileProgress";
 
 export type TypeMsgData<T={}> = {

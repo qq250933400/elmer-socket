@@ -7,6 +7,9 @@ type TypeSocketClientOption = {
     port: number;
     plugin?: any[];
     canRetryConnect?: boolean;
+    enableBeat?: boolean;
+    beatTime?: number;
+    beatTimeout?: number;
 };
 
 export class SocketClient<T={}> extends Common {
@@ -15,14 +18,21 @@ export class SocketClient<T={}> extends Common {
     fileObj: ClientReceiveFile;
     msgListener: any = {};
     private retryHandler: any;
+    private beatTimeCount: number = 0;
+    private beatTimeHandler: any;
+    private isConnecting: boolean = false;
     constructor(option: TypeSocketClientOption) {
         super();
         this.options = option;
         this.connection(option);
+        if(this.options.enableBeat) {
+            this.beatTime();
+        }
     }
     connection(option: TypeSocketClientOption): void {
         try {
             const connectionString = `ws://${option.host}:${option.port}`;
+            this.isConnecting = true;
             this.socket = this.createSocket(connectionString);
             this.socket.onmessage = this.onMessage.bind(this);
             this.socket.onopen = this.onConnected.bind(this);
@@ -86,6 +96,45 @@ export class SocketClient<T={}> extends Common {
             this.send(msgData);
         });
     }
+    dispose(): void {
+        if(this.beatTimeHandler && this.beatTimeHandler > 0) {
+            clearInterval(this.beatTimeHandler);
+            if(!this.socket.CLOSED && !this.socket.CLOSING) {
+                this.socket.close();
+            }
+        }
+    }
+    private beatTime(): void {
+        let timeout = undefined !== this.options.beatTime && this.options?.beatTime > 0 ? this.options.beatTime : 10;
+        let beatTimeout = undefined !== this.options.beatTimeout && this.options.beatTimeout > 3 ? this.options.beatTimeout : 10;
+        this.beatTimeHandler = setInterval(()=>{
+            if(!this.isConnecting) {
+                // 不在连接过程中的时候才做检测，正在连接跳过此步骤
+                if(this.beatTimeCount > 0 && this.beatTimeCount >= timeout) {
+                    timeout += beatTimeout
+                    this.sendAsync({
+                        msgType: "Beat",
+                        data: "hello wold",
+                        shouldBack: true
+                    }, beatTimeout * 1000).then(() => {
+                        this.beatTimeCount = 0;
+                    }).catch((err:any) => {
+                        this.beatTimeCount = 0;
+                        if(this.socket && this.socket.readyState !== 2 && this.socket.readyState !==3) {
+                            // readState !== 2 and readState !== 3 then the server is availabel, but server not response the Beat msg,
+                            // plase upgrade  
+                            console.error(err);
+                            console.error("Can not get beat resonse from websocket server. server side need do a upgrade.");
+                        } else {
+                            this.connection(this.options); // 心跳包未返回结果，连接失败，开启重连
+                        }
+                    });
+                } else {
+                    this.beatTimeCount += 1;
+                }
+            }
+        },1000);
+    }
     private createSocket(connectionString: string):any {
         try{
             return new WebSocket(connectionString);
@@ -97,15 +146,22 @@ export class SocketClient<T={}> extends Common {
         this.callPlugin("onClose");
     }
     private onError(err:any): void {
-        if(this.socket.readyState === 2 || this.socket.readyState === 3) {
+        const errorCode = err.error.code;
+        const readState = this.socket.readyState;
+        console.error(errorCode, readState);
+        if(readState === 3 || (readState === 2 && err.error.code === "ECONNREFUSED")) {
             console.log(`Try reconnecting to the server [ws://${this?.options?.host}:${this?.options?.port}]`);
+            this.isConnecting = true;
+            this.beatTimeCount = 0;
             this.connection(this.options);
         } else {
             this.callPlugin("onError", err);
         }
     }
     private onConnected(): void {
+        this.isConnecting = false;
         this.callPlugin("onConnected");
+        console.log(`Connected to server 'ws://${this?.options?.host}:${this?.options?.port}'`);
         if(this.retryHandler) {
             clearInterval(this.retryHandler);
         }
@@ -185,7 +241,7 @@ export class SocketClient<T={}> extends Common {
      * 在此方法绑定一些数据到Plugin对象
      */
     private initPlugin(): void {
-        console.log("初始化插件");
+        console.log("Initializing plug-ins");
         this.options?.plugin?.map((plugin:any) => {
             utils.defineReadOnlyProperty(plugin, "socket", this);
         });
