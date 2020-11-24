@@ -70,25 +70,39 @@ export class ServerSocket extends CommonUtils {
             this.socket.send(<any>msg.data);
         }
     }
-    sendAsync<T={}>(msgData: TypeMsgData<T>, timeout = 3000): Promise<any> {
+    sendAsync<T={}>(msgData: TypeMsgData<T>, timeout = 30000): Promise<any> {
+        const msgId = undefined !== msgData.msgId && !this.isEmpty(msgData.msgId) ? msgData.msgId : this.guid();
+        msgData.msgId = msgId;
         return new Promise<any>((resolve, reject)=> {
-            const msgId = this.guid();
-            msgData.msgId = msgId;
             msgData.shouldBack = true;
             (<any>msgData).backMsgType = "Promise_" + msgData.msgType;
-            const timeHandler = setInterval(() => {
-                reject({
-                    statusCode: "TIMEOUT",
-                    message: "Sending message timed out, no information returned or no application response。"
-                });
-                clearInterval(timeHandler);
-                delete this.msgListeners[msgId];
-            }, timeout);
             this.msgListeners[msgId] = {
+                timeCount: 0,
+                timeout,
+                msgType: "Progress_" + msgData.msgType,
+                timeTick: () => {
+                    (function(msgIdV:any,timeoutV: number, listenderObj: any):void {
+                        const timeHandler = setInterval(() => {
+                            const timeMaxCount = timeoutV / 1000;
+                            if(listenderObj[msgIdV].timeCount >= timeMaxCount) {
+                                listenderObj[msgIdV].reject({
+                                    statusCode: "TIMEOUT",
+                                    message: "Sending message timed out, no information returned or no application response。"
+                                });
+                                clearInterval(listenderObj[msgIdV].timeHandler);
+                                delete listenderObj[msgIdV];
+                            } else {
+                                listenderObj[msgIdV].timeCount += 1;
+                            }
+                        }, 1000);
+                        listenderObj[msgIdV].timeHandler = timeHandler;
+                    })(msgId, timeout, this.msgListeners);
+                },
                 resolve,
                 reject
             };
             this.send(msgData);
+            this.msgListeners[msgId].timeTick();
         });
     }
     /**
@@ -153,8 +167,19 @@ export class ServerSocket extends CommonUtils {
                                     } else {
                                         typeof this.msgListeners[msgData.msgId].resolve === "function" && this.msgListeners[msgData.msgId].resolve(msgData);
                                     }
+                                    clearInterval(this.msgListeners[msgData.msgId].timeHandler);
+                                    this.msgListeners[msgData.msgId].timeTick = null;
+                                    delete this.msgListeners[msgData.msgId].timeTick;
+                                    delete this.msgListeners[msgData.msgId];
+                                    // 清除引用
                                 } else {
                                     this.callPluginMethod("onMessage", msgData, msgEvt);
+                                }
+                            } else if(/^Progress_/.test(<any>msgData.msgType)) {
+                                const msgId = <any>msgData.msgId;
+                                if(this.msgListeners[msgId] && this.msgListeners[msgId].msgType === msgData.msgType) {
+                                    this.msgListeners[msgId].timeCount = 0;
+                                    // 此消息用于清除需要做Promise请求消息记录，当执行任务时间比较长时响应此消息，可以消除timeout错误不是预期问题.
                                 }
                             } else {
                                 if(msgData.msgType === "Beat") {

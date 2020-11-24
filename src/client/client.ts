@@ -73,28 +73,39 @@ export class SocketClient<T={}> extends Common {
         this.beatTimeCount = 0;
     }
     sendAsync(msgData: TypeMsgData<T>, timeout=30000): Promise<any> {
+        const msgId = undefined !== msgData.msgId && !this.isEmpty(msgData.msgId) ? msgData.msgId : utils.guid();
+        msgData.msgId = msgId;
         return new Promise((resolve, reject) => {
-            const msgId = utils.guid();
-            msgData.msgId = msgId;
-            const timHandler = (() => {
-                const timeHandler = setInterval(() => {
-                    reject({
-                        statusCode: "TIMEOUT",
-                        message: "Sending message timed out, no information returned or no application response。"
-                    });
-                    clearInterval(timeHandler);
-                    delete this.msgListener[msgId];
-                }, timeout);
-                return timeHandler;
-            })();
             (<any>msgData.backMsgType) = "Promise_" + msgData.msgType;
             msgData.shouldBack = true;
+            this.send(msgData);
             this.msgListener[msgId] = {
-                timeHandler: timHandler,
+                timeCount: 0,
+                timeout,
+                msgType: "Progress_" + msgData.msgType,
+                timeTick: () => {
+                    (function(msgIdV:any,timeoutV: number, listenderObj: any):void {
+                        const timeHandler = setInterval(() => {
+                            const timeMaxCount = timeoutV / 1000;
+                            if(listenderObj[msgIdV].timeCount >= timeMaxCount) {
+                                listenderObj[msgIdV].reject({
+                                    statusCode: "TIMEOUT",
+                                    message: "Sending message timed out, no information returned or no application response。"
+                                });
+                                clearInterval(listenderObj[msgIdV].timeHandler);
+                                listenderObj[msgIdV].timeTick = null;
+                                delete listenderObj[msgIdV].timeTick;
+                                delete listenderObj[msgIdV];
+                            } else {
+                                listenderObj[msgIdV].timeCount += 1;
+                            }
+                        }, 1000);
+                        listenderObj[msgIdV].timeHandler = timeHandler;
+                    })(msgId, timeout, this.msgListener);
+                },
                 resolve,
                 reject
             };
-            this.send(msgData);
         });
     }
     dispose(): void {
@@ -182,15 +193,23 @@ export class SocketClient<T={}> extends Common {
                         // 针对需要以promise处理返回消息的方式
                         const listener = this.msgListener[msgData.msgId as string];
                         if(listener) {
-                            clearTimeout(listener.timeHandler);
                             if(msgData.backFailResult) {
-                                listener.reject(msgData);
+                                typeof listener.reject === "function" && listener.reject(msgData);
                             } else {
-                                listener.resolve(msgData);
+                                typeof listener.resolve === "function" && listener.resolve(msgData);
                             }
-                            delete this.msgListener[msgData.msgId as string];
+                            clearInterval(listener.timeHandler);
+                            this.msgListener[msgData.msgId as any].timeTick = null;
+                            delete this.msgListener[msgData.msgId as any].timeTick;
+                            delete this.msgListener[msgData.msgId as any];
                         } else {
                             this.callPlugin("onMessage", msgData);
+                        }
+                    } else if(/^Progress_/.test(<any>msgData.msgType)) {
+                        const msgId = <any>msgData.msgId;
+                        if(this.msgListener[msgId] && this.msgListener[msgId].msgType === msgData.msgType) {
+                            this.msgListener[msgId].timeCount = 0;
+                            // 此消息用于清除需要做Promise请求消息记录，当执行任务时间比较长时响应此消息，可以消除timeout错误不是预期问题.
                         }
                     } else {
                         this.callPlugin("onMessage", msgData);
