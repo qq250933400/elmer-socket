@@ -1,5 +1,5 @@
 import fs from "fs";
-import { StaticCommon as utils } from "elmer-common";
+import { utils } from "elmer-common";
 
 export const getHost = () => {
     return function(target: any, attrKey: string) {

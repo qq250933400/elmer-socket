@@ -1,6 +1,6 @@
 import ClientReceiveFile from "./ClientReceiveFile";
 import { TypeFileSendProgress, TypeMsgData, TypePluginLifeCycle } from "../server/IServerSocket";
-import { StaticCommon as utils, Common} from "elmer-common";
+import { utils, Common} from "elmer-common";
 
 type TypeSocketClientOption = {
     host: string;
