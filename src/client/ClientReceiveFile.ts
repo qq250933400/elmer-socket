@@ -3,6 +3,7 @@ import fileTypes from "./fileTypes";
 import { SendFileTypes } from "./IClient";
 import { TypeMsgData, TypeSendFileInfo } from "../server/IServerSocket";
 import { CommonUtils, TypeMsgPackage } from "../utils/CommonUtils";
+import * as fs from "fs";
 
 type TypeReceiveFileEventName = "Start" | "End" | "Progress";
 type TypeSocketEventOptions = {
@@ -51,7 +52,6 @@ export default class ClientReceiveFile extends CommonUtils {
     sendFileInNode(fileName: string, toUser?: string, timeout: number = 30000): Promise<any> {
         return new Promise<any>((resolve, reject) => {
             try{
-                const fs = require("fs");
                 if(!fs.existsSync(fileName)) {
                     reject({
                         statusCode: "F_404",
