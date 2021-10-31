@@ -1,5 +1,5 @@
-import { WebClient } from "../src/app/WebClient";
-import { AClientModel } from "../src/app/AClientModel";
+import { WebClient } from "../src/core/WebClient";
+import { AClientModel } from "../src/core/AClientModel";
 import { utils } from "elmer-common";
 
 class ClientModel extends AClientModel {

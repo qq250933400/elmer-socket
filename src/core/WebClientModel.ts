@@ -12,4 +12,7 @@ export class WebClientModel extends AClientModel {
             return false;
         }
     }
+    public onMessage(event: MessageEvent): void {
+        console.log(event.type);
+    }
 }

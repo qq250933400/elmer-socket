@@ -21,6 +21,7 @@ type TypeServerSorketOptions = {
 export class ServerClient {
     private socket: WebSocket;
     private options: TypeServerSorketOptions;
+    private msgHooks: any = {};
     constructor(_socket: WebSocket, _option: TypeServerSorketOptions) {
         this.socket = _socket;
         this.options = _option;
@@ -28,10 +29,22 @@ export class ServerClient {
         this.socket.addEventListener("open",this.socketOpen.bind(this));
         this.socket.addEventListener("message", this.onMessage.bind(this));
     }
-    public send<T='None',P={}>(msgData: TypeMsgData<T,P>): Promise<any> {
-        return this.options.sendTo<T,P>({
-            ...msgData,
-            toUser:[this.options.id]
+    public send(msgData: TypeMsgData): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            const msgId: string = msgData.msgId || "sev_msg_" + utils.guid();
+            if(msgData.msgType !== "Binary") {
+                this.msgHooks[msgId] = {
+                    resolve,
+                    reject
+                };
+                this.socket.send(JSON.stringify(msgData))
+            } else {
+                this.socket.send(JSON.stringify(msgData))
+                resolve({
+                    status: 200,
+                    message: "success"
+                });
+            }
         });
     }
     private socketOpen(ev: Event) {

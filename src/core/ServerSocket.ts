@@ -55,40 +55,83 @@ export class ServerSocket extends Base {
                 const cid = (client as any).uid;
                 this.connections[cid] = null;
                 delete this.connections[cid];
-                console.log("client", client);
                 this.log("释放连接： " + cid, "DEBUG");
             },
             sendToAll: this.sendToAll.bind(this),
             sendTo: this.sendTo.bind(this)
         });
-        this.callModelApi("Connection", socket, req);
+        this.callModelApi("onConnection", socket, req);
         this.log("客户端连接：" + uid, "DEBUG");
     }
-    sendToAll<T="None", P={}>(msgData: TypeMsgData<T, P>): void {
-        const msgId = "sev_msg_" + utils.guid();
-        const sendMsg: any = msgData.msgType !== "Binary" ? msgData.data : JSON.stringify({
-            ...msgData,
-            msgId
+    sendToAll<T="None", P={}>(msgData: TypeMsgData<T, P>): Promise<any> {
+        const toUsers: string[] = [];
+        Object.keys(this.connections).map((uid: string) => {
+            toUsers.push(uid);
         });
-        Object.keys(this.connections).forEach((cid: string) => {
-            const client:ServerClient = this.connections[cid];
-            client.send(sendMsg)
+        return this.sendTo<T,P>({
+            ...msgData,
+            toUser: toUsers
         });
     }
-    sendTo<T="None", P={}>(msgData: TypeMsgData<T>, toUser: string): Promise<P> {
+    sendTo<T="None", P={}>(msgData: TypeMsgData<T>): Promise<P> {
         return new Promise<P>((resolve, reject) =>{
             const msgId = "sev_msg_" + utils.guid();
-            const sendMsg = msgData.msgType !== "Binary" ? JSON.stringify({
-                ...msgData,
-                msgId,
-            }) : msgData.data;
-            if(this.connections[toUser]) {
-                (this.connections[toUser] as ServerClient).send<T,P>(sendMsg as any);
+            const sendStatus:any = {};
+            const sendResult: any = {};
+            const checkSendStatus = (): void => {
+                let pass = true;
+                let sendAll = true;
+                Object.keys(sendStatus).forEach((sid: string) => {
+                    const status = sendStatus[sid];
+                    if(status === "Send") {
+                        sendAll = false;
+                    }
+                    if(status === "Fail") {
+                        pass = false;
+                    }
+                });
+                if(sendAll) {
+                    if(pass) {
+                        resolve(sendResult);
+                    } else {
+                        reject(sendResult);
+                    }
+                }
+            }
+            if(msgData.toUser && msgData.toUser.length > 0) {
+                msgData.toUser.forEach((uid: string) => {
+                    if(this.connections[uid]) {
+                        sendStatus[uid] = "Send";
+                        ((sid: string) => {
+                            (this.connections[uid] as ServerClient).send({
+                                ...msgData,
+                                msgId
+                            } as any).then((data) => {
+                                sendStatus[uid] = "Success";
+                                sendResult[sid] = data;
+                                checkSendStatus();
+                            }).catch((err) => {
+                                sendStatus[uid] = "Fail";
+                                sendResult[sid] = err;
+                                checkSendStatus();
+                            });
+                        })(uid);
+                    } else {
+                        sendStatus[uid] = "Fail";
+                    }
+                });
+            } else {
+                reject({
+                    statusCode: "WS_404",
+                    message: "未指定发送用户ID",
+                    msgData
+                });
             }
             if(msgData.rNotify) {
                 this.msgHooks[msgId] = {
                     resolve,
-                    reject
+                    reject,
+                    toUser: msgData.toUser
                 };
             } else {
                 resolve({
@@ -116,7 +159,7 @@ export class ServerSocket extends Base {
                 const callEventName = targetName && !utils.isEmpty(targetName) ? targetName : eventName;
                 let modelObj = this.modelObjs[uid];
                 if(!modelObj) {
-                    modelObj = new modelFactory();
+                    modelObj = new modelFactory(this);
                     this.modelObjs[uid] = modelObj;
                 }
                 if(typeof modelObj[callEventName] === "function"){

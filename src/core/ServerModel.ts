@@ -20,7 +20,6 @@ export class ServerModel extends AServerModel {
                     toUser: [event.uid],
                     isBacked: true
                 });
-                console.log("send message back: ", event.uid);
                 break;
             }
         }

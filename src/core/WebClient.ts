@@ -22,6 +22,7 @@ export class WebClient extends Base {
     private autoConnect: boolean = false;
     private lastBeatTime: number = 0;
     private beatTimer: any;
+    private msgHooks: any = {};
     constructor(config: TypeWebClientOptions) {
         super();
         this.models = [
@@ -66,7 +67,7 @@ export class WebClient extends Base {
             this.beatTimer = setInterval(() => {
                 const now = new Date().getTime();
                 const effTime = now - this.lastBeatTime;
-                if(effTime > 3000 && this.isConnected) {
+                if(effTime > 30000 && this.isConnected) {
                     this.socket.send(JSON.stringify(({
                         msgType: "Beat",
                         msgId: "beat_" + now
@@ -151,7 +152,7 @@ export class WebClient extends Base {
                 const callEventName = targetName && !utils.isEmpty(targetName) ? targetName : eventName;
                 let modelObj = this.modelObjs[uid];
                 if(!modelObj) {
-                    modelObj = new modelFactory(this.socket);
+                    modelObj = new modelFactory(this.socket, this.exportClientApi());
                     this.modelObjs[uid] = modelObj;
                 }
                 if(typeof modelObj[callEventName] === "function"){
@@ -163,6 +164,35 @@ export class WebClient extends Base {
                         break;
                     }
                 }
+            }
+        }
+    }
+    private exportClientApi() {
+        return {
+            send: <T="None",Attr={}>(data: TypeMsgData<T,Attr>): Promise<any> => {
+                return new Promise<any>((resolve, reject) => {
+                    const msgId = "wci_msg_" + utils.guid();
+                    if(data.msgType !== "Binary") {
+                        this.socket.send(JSON.stringify({
+                            ...data,
+                            msgId
+                        }));
+                    } else {
+                        // 发送二进制包
+                        console.error("not surpport");
+                    }
+                    if(data.rNotify) {
+                        this.msgHooks[msgId] = {
+                            resolve,
+                            reject
+                        }
+                    } else {
+                        resolve({
+                            statusCode: 200,
+                            message: "sent success"
+                        });
+                    }
+                });
             }
         }
     }
