@@ -8,10 +8,10 @@ class ServerModel extends AServerModel {
             this.sendTo({
                 msgType: "Chat",
                 data: "Message from server",
-                toUser: [message.uid]
+                toUser: [message.fromUser]
             });
         }
-        console.log("---ServerModel---", message.uid, msgData);
+        console.log("---ServerModel---", message.fromUser, msgData);
     }
     public undeliveredMessages?(message: MessageEvent<any>): boolean | undefined{
         if(message.type === "message" && utils.isString(message.data)) {

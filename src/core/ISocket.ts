@@ -39,7 +39,7 @@ export type TypeServerMessageEvent = {
     client: WebSocket;
     reply<T='None', P={}>(msgData: TypeMsgData<T,P>): any;
     type: string;
-    uid: string;
+    fromUser: string;
 }
 
 export type TypeClientModelOptions = {

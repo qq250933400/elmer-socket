@@ -17,7 +17,7 @@ export class ServerModel extends AServerModel {
             case "Beat": {
                 event.reply({
                     msgType: "Beat",
-                    toUser: [event.uid],
+                    toUser: [event.fromUser],
                     isBacked: true
                 });
                 break;

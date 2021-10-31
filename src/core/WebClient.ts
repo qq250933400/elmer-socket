@@ -5,6 +5,11 @@ import WSWebSocket, { OpenEvent } from "ws";
 import { utils } from "elmer-common";
 import { WebClientModel } from "./WebClientModel";
 
+type TypeOverrideConnect = {
+    host: string;
+    port: number;
+};
+
 export class WebClient extends Base {
     @GetConfig<TypeWebclientConfig>("./config/server_socket.json", {
         host: "127.0.0.1",
@@ -39,8 +44,10 @@ export class WebClient extends Base {
             }
         }
     }
-    start(isRetry?: boolean) {
-        const connectionString = `ws://${this.config.host}:${this.config.port}`;
+    start(isRetry?: boolean, connect?: TypeOverrideConnect) {
+        const host = connect?.host || this.config.host;
+        const port = connect?.port || this.config.port;
+        const connectionString = `ws://${host}:${port}`;
         if(!isRetry && this.retryTimer) {
             clearInterval(this.retryTimer);
         }

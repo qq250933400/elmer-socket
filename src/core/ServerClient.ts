@@ -58,7 +58,7 @@ export class ServerClient {
             reply: this.send.bind(this),
             type: "message",
             data: message.data,
-            uid: this.options.id
+            fromUser: this.options.id
         }, msgData);
     }
 }
