@@ -157,19 +157,20 @@ export class ServerSocket extends Base {
             const uid = modelFactory.uid;
             if(!utils.isEmpty(uid) && (utils.isEmpty(targetId) || (!utils.isEmpty(targetId) && targetId === uid))) {
                 const callEventName = targetName && !utils.isEmpty(targetName) ? targetName : eventName;
-                let modelObj = this.modelObjs[uid];
-                if(!modelObj) {
-                    modelObj = new modelFactory(this);
-                    this.modelObjs[uid] = modelObj;
-                }
-                if(typeof modelObj[callEventName] === "function"){
-                    callApiResult = modelObj[callEventName].apply(modelObj, args);
-                    if(callApiResult) {
-                        return callApiResult;
+                if(typeof modelFactory.undeliveredMessages === "function" && modelFactory.undeliveredMessages(...args)) {
+                    let modelObj = this.modelObjs[uid];
+                    if(!modelObj) {
+                        modelObj = new modelFactory(this);
+                        this.modelObjs[uid] = modelObj;
+                        typeof modelObj.onInit === "function" && modelObj.onInit();
                     }
-                    if(typeof modelObj.undeliveredMessages === "function" && modelObj.undeliveredMessages.apply(modelObj, args)) {
-                        break;
+                    if(typeof modelObj[callEventName] === "function"){
+                        callApiResult = modelObj[callEventName].apply(modelObj, args);
+                        if(callApiResult) {
+                            return callApiResult;
+                        }
                     }
+                    break;
                 }
             }
         }

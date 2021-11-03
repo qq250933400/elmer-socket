@@ -13,7 +13,7 @@ export abstract class AServerModel extends AModel{
         super();
         this.server = _server;
     }
-    public abstract undeliveredMessages?(message: TypeUndeliveredMessageEvent): boolean| undefined;
+    public static undeliveredMessages?(message: TypeUndeliveredMessageEvent): boolean| undefined;
     sendTo<T="None",P={}>(msgData: TypeMsgData<T>): Promise<P> {
         return this.server.sendTo(msgData);
     }

@@ -4,7 +4,7 @@ import { TypeMsgData, TypeServerMessageEvent } from "./ISocket";
 
 export class ServerModel extends AServerModel {
     static uid: string = "ServerModel_ec84d2ce-e8cc-89c6-02b2-9d10021b";
-    public undeliveredMessages?(event: TypeUndeliveredMessageEvent): boolean | undefined{
+    public static undeliveredMessages?(event: TypeUndeliveredMessageEvent): boolean | undefined{
         if(event.type === "message" && utils.isString(event.data)) {
             const msgData: TypeMsgData = JSON.parse(event.data);
             return ["Beat"].indexOf(msgData.msgType) >= 0;
