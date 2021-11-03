@@ -1,6 +1,6 @@
 {
     "name": "elmer-socket",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "description": "websocket",
     "typings": "type/index.d.ts",
     "main": "lib/index.js",
