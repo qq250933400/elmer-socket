@@ -10,6 +10,7 @@ export abstract class AClientModel extends AModel {
         this.socket = _socket;
         this.options = _options;
     }
+    public onInit?(): void;
     public onClose?(event:CloseEvent):void;
     public onError?(event:ErrorEvent):void;
     public onOpen?(event: OpenEvent):void;

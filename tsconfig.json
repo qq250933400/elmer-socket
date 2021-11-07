@@ -11,7 +11,7 @@
     "sourceMap": true,
     "outDir": "./lib",
     "declaration": true,
-    "declarationDir": "./type",
+    "declarationDir": "./lib",
     "moduleResolution": "node",
     "removeComments": true,
     "noImplicitAny": true,

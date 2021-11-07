@@ -1,6 +1,6 @@
 import { GetConfig } from "../utils/file";
 import { Base } from "./Base";
-import { TypeWebclientConfig, TypeWebClientOptions, TypeMsgData } from "./ISocket";
+import { TypeWebclientConfig, TypeWebClientOptions, TypeMsgData, TypeBaseModelMethod } from "./ISocket";
 import WSWebSocket, { OpenEvent } from "ws";
 import { utils } from "elmer-common";
 import { WebClientModel } from "./WebClientModel";
@@ -10,7 +10,7 @@ type TypeOverrideConnect = {
     port: number;
 };
 
-export class WebClient extends Base {
+export class WebClient<UseModel={}> extends Base {
     @GetConfig<TypeWebclientConfig>("./config/server_socket.json", {
         host: "127.0.0.1",
         port: 8000
@@ -28,12 +28,12 @@ export class WebClient extends Base {
     private lastBeatTime: number = 0;
     private beatTimer: any;
     private msgHooks: any = {};
-    constructor(config: TypeWebClientOptions) {
+    constructor(config: TypeWebClientOptions<UseModel>) {
         super();
-        this.models = [
-            WebClientModel,
-            ...(config.models || []) as any
-        ];
+        this.models = {
+            ...(config.models || {}) as any,
+            "wct_ee63fe05-83dd-ac39-9874-bf36b663": WebClientModel
+        };
         this.retryTimeoutCount = config.retryTime || 5;
         this.autoConnect = config.autoConnect || false;
         if(this.models.length > 0) {
@@ -67,6 +67,19 @@ export class WebClient extends Base {
     }
     get isConnect():boolean {
         return this.isConnected;
+    }
+    callApi<M extends keyof UseModel>(model: M, method: Exclude<keyof UseModel[M], TypeBaseModelMethod>, ...args:any[]): any {
+        const TargetModel:any = this.models[model as any];
+        if(TargetModel) {
+            const uid = TargetModel.uid;
+            const obj = this.modelObjs[uid] || new TargetModel(this.socket, this.exportClientApi());
+            if(!this.modelObjs[uid]) {
+                this.modelObjs[uid] = obj;
+            }
+            if(typeof obj[method as any] === "function") {
+                return obj[method as any].apply(obj, args);
+            }
+        }
     }
     private startBeatListen(){
         if(!this.beatTimer) {
@@ -148,12 +161,13 @@ export class WebClient extends Base {
      * @returns 返回值
      */
      private callModelApi(eventName: string, ...args: any[]): any {
-        const AllModels: any[] = this.models || [];
+        const AllModels: any = this.models || {};
         const targetMatch = eventName.match(/^([a-z0-9_-]{1,})\.([a-z0-9_-]{1,})$/i);
         const targetId = targetMatch ? targetMatch[1] : null;
         const targetName = targetMatch ? targetMatch[2] : null;
         let callApiResult: any;
-        for(const modelFactory of AllModels){
+        Object.keys(AllModels).forEach((keyId: string) => {
+            const modelFactory = AllModels[keyId];
             const uid = modelFactory.uid;
             if(!utils.isEmpty(uid) && (utils.isEmpty(targetId) || (!utils.isEmpty(targetId) && targetId === uid))) {
                 const callEventName = targetName && !utils.isEmpty(targetName) ? targetName : eventName;
@@ -170,10 +184,9 @@ export class WebClient extends Base {
                             return callApiResult;
                         }
                     }
-                    break;
                 }
             }
-        }
+        });
     }
     private exportClientApi() {
         return {

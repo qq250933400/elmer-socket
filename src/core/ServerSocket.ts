@@ -11,27 +11,31 @@ import { ServerClient } from "./ServerClient";
 import { Base } from "./Base";
 import { ServerModel } from "./ServerModel";
 
-export class ServerSocket extends Base {
+export class ServerSocket<UseModels={}> extends Base {
     @GetConfig<TypeServerSocketConfig>("./config/server_socket.json", {
         host: "0.0.0.0",
         port: 8000
     })
     private config: TypeServerSocketConfig;
 
-    private models: any[] = [];
+    private models: any = {};
     private modelObjs: any = {};
     private socketServer: WebSocketServer;
     private connections: any = {};
     private msgHooks: any = {};
-    constructor(options: TypeServerSocketOptions) {
+    constructor(options: TypeServerSocketOptions<UseModels>) {
         super();
-        this.models = [ ServerModel, ...(options.models || []) ];
+        this.models = {
+            ...(options.models || {}),
+            "sct_ee63fe05-83dd-ac39-9874-bf36b663": ServerModel
+        };
         if(this.models.length > 0) {
-            for(const Factory of this.models) {
+            Object.keys(this.models).forEach((modelId: string) => {
+                const Factory = this.models[modelId];
                 if(utils.isEmpty((Factory as any).uid)) {
                     throw new Error("定义Model缺少uid静态类属性设置。");
                 }
-            }
+            });
         }
     }
     listen() {
@@ -148,12 +152,13 @@ export class ServerSocket extends Base {
      * @returns 返回值
      */
     private callModelApi(eventName: string, ...args: any[]): any {
-        const AllModels: any[] = this.models || [];
+        const AllModels: any = this.models || {};
         const targetMatch = eventName.match(/^([a-z0-9_-]{1,})\.([a-z0-9_-]{1,})$/i);
         const targetId = targetMatch ? targetMatch[1] : null;
         const targetName = targetMatch ? targetMatch[2] : null;
         let callApiResult: any;
-        for(const modelFactory of AllModels){
+        Object.keys(AllModels).forEach((mid: string) => {
+            const modelFactory = AllModels[mid];
             const uid = modelFactory.uid;
             if(!utils.isEmpty(uid) && (utils.isEmpty(targetId) || (!utils.isEmpty(targetId) && targetId === uid))) {
                 const callEventName = targetName && !utils.isEmpty(targetName) ? targetName : eventName;
@@ -170,9 +175,8 @@ export class ServerSocket extends Base {
                             return callApiResult;
                         }
                     }
-                    break;
                 }
             }
-        }
+        })
     }
 }

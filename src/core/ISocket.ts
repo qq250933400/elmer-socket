@@ -3,12 +3,13 @@ export type TypeServerSocketConfig = {
     port: number;
 };
 
-export type TypeServerSocketOptions = {
-    models: any[];
+export type TypeServerSocketOptions<Models={}> = {
+    models: {[P in keyof Models]: any};
 };
 
 export type TypeBaseMsgType = "Connected" | "Beat" | "Chat" | "Binary";
 export type TypePluginLifeCycle = "onClose" | "onError" | "onConnected" | "onMessage" | "onStartReceiveFile" | "onEndReceiveFile" | "onSendFileProgress";
+export type TypeBaseModelMethod = "onClose" | "onError" | "onOpen" | "onMessage";
 
 export type TypeMsgData<T="None", ExtArr = {}> = {
     data?: string|object|number|Array<{}>|Blob;
@@ -28,8 +29,8 @@ export type TypeWebclientConfig = {
     port: number;
 };
 
-export type TypeWebClientOptions = {
-    models?: (new(...args: any[]) => any)[];
+export type TypeWebClientOptions<Models={}> = {
+    models?: {[P in keyof Models]: any};
     retryTime?: number;
     autoConnect?: boolean;
 };
