@@ -1,4 +1,3 @@
-import { GetConfig } from "../utils/file";
 import { Base } from "./Base";
 import { TypeWebclientConfig, TypeWebClientOptions, TypeMsgData, TypeBaseModelMethod } from "./ISocket";
 import WSWebSocket, { OpenEvent } from "ws";
@@ -11,10 +10,6 @@ type TypeOverrideConnect = {
 };
 
 export class WebClient<UseModel={}> extends Base {
-    @GetConfig<TypeWebclientConfig>("./config/server_socket.json", {
-        host: "127.0.0.1",
-        port: 8000
-    })
     private config: TypeWebclientConfig;
     private socket: WebSocket;
     private isConnected: boolean = false;
@@ -36,6 +31,8 @@ export class WebClient<UseModel={}> extends Base {
         };
         this.retryTimeoutCount = config.retryTime || 5;
         this.autoConnect = config.autoConnect || false;
+        this.config.host = config.host;
+        this.config.port = config.port;
         if(this.models.length > 0) {
             for(const Factory of this.models) {
                 if(utils.isEmpty((Factory as any).uid)) {

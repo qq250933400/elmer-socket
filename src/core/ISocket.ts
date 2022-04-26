@@ -33,6 +33,8 @@ export type TypeWebClientOptions<Models={}> = {
     models?: {[P in keyof Models]: any};
     retryTime?: number;
     autoConnect?: boolean;
+    host: string;
+    port: number;
 };
 
 export type TypeServerMessageEvent = {

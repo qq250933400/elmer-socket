@@ -2,7 +2,9 @@ import { utils } from "elmer-common";
 import { AServerModel, TypeUndeliveredMessageEvent } from "./AServerModel";
 import { TypeMsgData, TypeServerMessageEvent } from "./ISocket";
 
-export class ServerModel extends AServerModel {
+type TypeServerMsgType = "Beat"| "None";
+
+export class ServerModel extends AServerModel<"Beat"| "None"> {
     static uid: string = "ServerModel_ec84d2ce-e8cc-89c6-02b2-9d10021b";
     public static undeliveredMessages?(event: TypeUndeliveredMessageEvent): boolean | undefined{
         if(event.type === "message" && utils.isString(event.data)) {
@@ -12,7 +14,7 @@ export class ServerModel extends AServerModel {
             return false;
         }
     }
-    onMessage (event:TypeServerMessageEvent, msgData: TypeMsgData) {
+    public onMessage(event: TypeServerMessageEvent, msgData: TypeMsgData<TypeServerMsgType>): void {
         switch(msgData.msgType) {
             case "Beat": {
                 event.reply({
