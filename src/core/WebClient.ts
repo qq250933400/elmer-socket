@@ -29,10 +29,13 @@ export class WebClient<UseModel={}> extends Base {
             ...(config.models || {}) as any,
             "wct_ee63fe05-83dd-ac39-9874-bf36b663": WebClientModel
         };
+        this.config = {
+            host: config.host,
+            port: config.port
+        };
         this.retryTimeoutCount = config.retryTime || 5;
         this.autoConnect = config.autoConnect || false;
-        this.config.host = config.host;
-        this.config.port = config.port;
+         
         if(this.models.length > 0) {
             for(const Factory of this.models) {
                 if(utils.isEmpty((Factory as any).uid)) {

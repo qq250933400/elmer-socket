@@ -1,4 +1,3 @@
-import "colors";
 type TypeLogType = "INFO" | "ERROR" | "WARN" | "SUCCESS" | "DEBUG";
 
 export class Base {
@@ -8,13 +7,13 @@ export class Base {
         const timeStr = [this.formatLen(now.getHours(), 2), this.formatLen(now.getMinutes(), 2), this.formatLen(now.getSeconds(),2)].join(":");
         const dateTimeStr = dateStr + " " + timeStr;
         if(type === "INFO") {
-            console.log(`[${type}][${dateTimeStr}] ${msg}`.white);
+            console.info(`[${type}][${dateTimeStr}] ${msg}`);
         } else if(type === "ERROR") {
-            console.log(`[${type}][${dateTimeStr}] ${msg}`.red);
+            console.error(`[${type}][${dateTimeStr}] ${msg}`);
         } else if(type === "WARN") {
-            console.log(`[${type}][${dateTimeStr}] ${msg}`.yellow);
+            console.warn(`[${type}][${dateTimeStr}] ${msg}`);
         } else if(type === "SUCCESS") {
-            console.log(`[${type}][${dateTimeStr}] ${msg}`.green);
+            console.log(`[${type}][${dateTimeStr}] ${msg}`);
         } else {
             console.log(`[${type}][${dateTimeStr}] ${msg}`);
         }
