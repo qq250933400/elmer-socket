@@ -4,7 +4,7 @@ import { TypeMsgData, TypeServerMessageEvent } from "./ISocket";
 
 type TypeServerMsgType = "Beat"| "None";
 
-export class ServerModel extends AServerModel<"Beat"| "None"> {
+export class ServerModel extends AServerModel<TypeServerMsgType> {
     static uid: string = "ServerModel_ec84d2ce-e8cc-89c6-02b2-9d10021b";
     public static undeliveredMessages?(event: TypeUndeliveredMessageEvent): boolean | undefined{
         if(event.type === "message" && utils.isString(event.data)) {
@@ -14,7 +14,7 @@ export class ServerModel extends AServerModel<"Beat"| "None"> {
             return false;
         }
     }
-    public onMessage(event: TypeServerMessageEvent, msgData: TypeMsgData<TypeServerMsgType>): void {
+    public onMessage<T=TypeServerMsgType>(event: TypeServerMessageEvent, msgData: TypeMsgData<T>): void {
         switch(msgData.msgType) {
             case "Beat": {
                 event.reply({
