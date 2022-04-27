@@ -3,11 +3,13 @@ import { TypeWebclientConfig, TypeWebClientOptions, TypeMsgData, TypeBaseModelMe
 import WSWebSocket, { OpenEvent } from "ws";
 import { utils } from "elmer-common";
 import { WebClientModel } from "./WebClientModel";
+import { callModelApi, callModelHandleMsg } from "./decorators";
 
 type TypeOverrideConnect = {
     host: string;
     port: number;
 };
+
 
 export class WebClient<UseModel={}> extends Base {
     private config: TypeWebclientConfig;
@@ -99,7 +101,7 @@ export class WebClient<UseModel={}> extends Base {
         }
     }
     private onWebsocketError(event: ErrorEvent): void {
-        if(event.error.code === "ECONNREFUSED") {
+        if(event.error?.code === "ECONNREFUSED") {
             this.startConnected = false;
             if(!this.retryTimer) {
                 this.retryTimer = setInterval(() =>{
@@ -145,7 +147,23 @@ export class WebClient<UseModel={}> extends Base {
         this.log("连接成功。。。", "DEBUG");
     }
     private onMessage(d: MessageEvent) {
-        this.callModelApi("onMessage", d);
+        const data: TypeMsgData = typeof d.data === "string" ? JSON.parse(d.data) : d.data;
+        const objResult = callModelHandleMsg​​(data?.msgType, { ...this.exportClientApi() });
+        if(objResult) {
+            objResult.target[objResult.method]({
+                message: d,
+                data,
+                ...this.exportClientApi()
+            });
+        } else {
+            if(!this.callModelApi("onMessage", {
+                message: d,
+                data,
+                ...this.exportClientApi()
+            })) {
+                console.error("No message handle for the request.", data);
+            }
+        }
     }
     private createSocket(connectionString: string):any {
         try{
@@ -166,7 +184,7 @@ export class WebClient<UseModel={}> extends Base {
         const targetId = targetMatch ? targetMatch[1] : null;
         const targetName = targetMatch ? targetMatch[2] : null;
         let callApiResult: any;
-        Object.keys(AllModels).forEach((keyId: string) => {
+        for(const keyId of Object.keys(AllModels)) {
             const modelFactory = AllModels[keyId];
             const uid = modelFactory.uid;
             if(!utils.isEmpty(uid) && (utils.isEmpty(targetId) || (!utils.isEmpty(targetId) && targetId === uid))) {
@@ -186,7 +204,23 @@ export class WebClient<UseModel={}> extends Base {
                     }
                 }
             }
-        });
+        };
+    }
+    /**
+     * 调用decorator装载的模块方法
+     * @param uid - 指定模块ID
+     * @param method - 调用方法名
+     * @param args - [可选]调用参数
+     * @returns 
+     */
+    callApiEx(uid: string, method: string, ...args: any[]) {
+        return callModelApi({
+            uid,
+            method,
+            initOpt: {
+                ...this.exportClientApi()
+            }
+        }, ...args);
     }
     private exportClientApi() {
         return {

@@ -2,8 +2,11 @@ import { OpenEvent } from "ws";
 import { AModel } from "./AModel";
 import { TypeClientModelOptions, TypeMsgData } from "./ISocket";
 
-export abstract class AClientModel extends AModel {
+type TypeMsgTypes<T> = keyof T;
+
+export abstract class AClientModel<MsgData={}> extends AModel {
     public socket:WebSocket;
+    public msgInclude: TypeMsgTypes<MsgData>[];
     private options: TypeClientModelOptions;
     constructor(_socket: WebSocket, _options: TypeClientModelOptions) {
         super();
@@ -16,7 +19,7 @@ export abstract class AClientModel extends AModel {
     public onOpen?(event: OpenEvent):void;
     public abstract onMessage?(event:MessageEvent):void;
     public static undeliveredMessages?(message: MessageEvent): boolean | undefined;
-    public sendMsg<T="", P={}, Attr={}>(msgData: TypeMsgData<T, Attr>): Promise<P> {
-        return this.options.send<T, Attr>(msgData as any);
+    public sendMsg<MsgType extends keyof MsgData, P={}>(msgData: TypeMsgData<MsgType, MsgData[MsgType]>): Promise<P> {
+        return this.options.send<MsgType, MsgData[MsgType]>(msgData as any);
     }
 }

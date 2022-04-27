@@ -37,14 +37,38 @@ export type TypeWebClientOptions<Models={}> = {
     port: number;
 };
 
-export type TypeServerMessageEvent = {
+export type TypeServerMessageEvent<TypeDefineMsgData={}> = {
     message: MessageEvent;
     client: WebSocket;
-    reply<T='None', P={}>(msgData: TypeMsgData<T,P>): any;
-    type: string;
+    reply<MT extends keyof TypeDefineMsgData>(msgData: TypeMsgData<MT, TypeDefineMsgData[MT]>): any;
+    type: keyof TypeDefineMsgData;
     fromUser: string;
 }
 
 export type TypeClientModelOptions = {
     send<T="None", Attr={}>(data: TypeMsgData<T, Attr>): Promise<any>;
+};
+
+export type TypeServerMessageEventEx<DefineMsgData, DefineMsgType extends keyof DefineMsgData> = {
+    reply: <MsgType extends keyof DefineMsgData>(data: TypeMsgData<MsgType, DefineMsgData[MsgType]>) => Promise<any>;
+    sendTo: <MsgType extends keyof DefineMsgData>(uid: string[], msgData: TypeMsgData<MsgType, DefineMsgData[MsgType]>) => Promise<any>;
+    sendToAll: <MsgType extends keyof DefineMsgData>(msgData: TypeMsgData<MsgType, DefineMsgData[MsgType]>) => Promise<any>;
+    data: TypeMsgData<DefineMsgType, DefineMsgData[DefineMsgType]>;
+    message: MessageEvent;
+};
+
+export type TypeServerModelOption<DefineMsgData> = {
+    reply: <MsgType extends keyof DefineMsgData>(data: TypeMsgData<MsgType, DefineMsgData[MsgType]>) => Promise<any>;
+    sendTo: <MsgType extends keyof DefineMsgData>(uid: string[], msgData: TypeMsgData<MsgType, DefineMsgData[MsgType]>) => Promise<any>;
+    sendToAll: <MsgType extends keyof DefineMsgData>(msgData: TypeMsgData<MsgType, DefineMsgData[MsgType]>) => Promise<any>;
+};
+
+export type TypeWebMessageEvent<DefineMsgData, MsgType extends keyof DefineMsgData> = {
+    message: MessageEvent;
+    data: DefineMsgData[MsgType];
+    send: (data: DefineMsgData[MsgType]) => Promise<any>;
+};
+
+export type TypeWebModelOption<DefineMsgData> = {
+    send: <MsgType extends keyof DefineMsgData>(data: TypeMsgData<MsgType, DefineMsgData[MsgType]>) => Promise<any>;
 };

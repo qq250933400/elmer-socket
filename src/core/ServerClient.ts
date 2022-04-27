@@ -1,6 +1,7 @@
 import { utils } from "elmer-common";
 import { IncomingMessage } from "http";
 import { TypeMsgData } from "./ISocket";
+import { callModelHandleMsg } from "./decorators";
 
 type TypeModelMethodNames = "Connection" | "onError" | "onOpen" | "onClose" | "onMessage";
 type TypeSocketCloseEventHandler = (ev:CloseEvent) => any;
@@ -51,14 +52,27 @@ export class ServerClient {
         this.options.callApi("onOpen", ev);
     }
     private onMessage(message: MessageEvent) {
-        const msgData = utils.isString(message.data) ? JSON.parse(message.data) : message.data;
-        this.options.callApi("onMessage", {
+        const msgData: TypeMsgData = utils.isString(message.data) ? JSON.parse(message.data) : message.data;
+        const eventData = {
             message,
             client: this.socket,
             reply: this.send.bind(this),
-            type: "message",
+            type: msgData.msgType,
             data: message.data,
             fromUser: this.options.id
-        }, msgData);
+        };
+        const evtResult = callModelHandleMsg(msgData.msgType, {
+            reply: this.send.bind(this),
+            sendTo: this.options.sendTo,
+            sendToAll: this.options.sendToAll
+        });
+        if(evtResult) {
+            evtResult.target[evtResult.method](eventData,  {
+                fromUser: this.options.id,
+                ...msgData
+            });
+        } else {
+            this.options.callApi("onMessage", eventData, msgData);
+        }
     }
 }
