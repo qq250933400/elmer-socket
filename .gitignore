@@ -1,6 +1,8 @@
 /node_modules/
 /lib/
 /type/
+/log/
+/config/
 /.DS_Store
 /**/*/.DS_Store
 /mochawesome-report/

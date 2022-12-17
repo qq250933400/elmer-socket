@@ -1,5 +1,4 @@
 import *  as fs from "fs";
-import * as path from "path";
 import { utils } from "elmer-common";
 
 /**
@@ -45,38 +44,3 @@ export const checkDir = (checkPath: string, securityPath?: string): void => {
         }
     }
 }
-/**
- * 读取配置文件
- * @param fileName - 配置文件相对路径 
- * @param initData - 默认参数，当配置文件不存在时将会使用此数据并生成配置文件
- * @returns 
- */
-export const GetConfig = <T={}>(fileName: string, initData?: T):Function => {
-    return (target: any, attr: string):T => {
-        const configFileName = path.resolve(process.cwd(), fileName);
-        if(fs.existsSync(configFileName)) {
-            const txt = fs.readFileSync(configFileName, "utf-8");
-            const txtData = JSON.parse(txt);
-            Object.defineProperty(target, attr, {
-                value: txtData,
-                configurable: false,
-                writable: false
-            });
-            return txtData;
-        } else {
-            if(initData) {
-                Object.defineProperty(target, attr, {
-                    value: initData,
-                    configurable: false,
-                    writable: false
-                });
-                const savePath = getFilePath(configFileName);
-                checkDir(savePath, process.cwd());
-                fs.writeFileSync(configFileName, JSON.stringify(initData, null, 4), "utf-8");
-                return initData;
-            } else {
-                throw new Error("Can not found the configuration file. please check the ENV config");
-            }
-        }
-    }
-};
