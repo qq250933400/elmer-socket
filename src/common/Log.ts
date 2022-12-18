@@ -1,8 +1,8 @@
 import { AppService } from "elmer-common";
 import { CommonUtils } from "../utils/CommonUtils";
 import { GetConfig } from "./decorators";
-import { CONST_SERVER_CONFIG_FILENAME, CONST_SERVER_CONFIG_INITDATA } from "../data/const";
-import { IServerConfig } from "../config/IServerConfig";
+import { CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA } from "../data/const";
+import { ILogConfig } from "../config/ILogConfig";
 import { checkDir } from "../utils/file";
 import * as fs from "fs";
 
@@ -10,16 +10,15 @@ export type TypeLogType = "ERROR" | "INFO" | "DEBUG" | "WARN" | "SUCCESS";
 
 @AppService
 export class Log extends CommonUtils {
-
-    @GetConfig(CONST_SERVER_CONFIG_FILENAME, CONST_SERVER_CONFIG_INITDATA)
-    private config: IServerConfig​​;
+    @GetConfig(CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA)
+    private config: ILogConfig;
     private mode: "node"|"web" = "web";
     private savePath: string;
     init() {
-        this.mode = this.config.log?.mode || "web";
+        this.mode = this.config?.mode || "web";
         if(this.mode === "node") {
             const path = require("path");
-            const logPath = path.resolve(process.cwd(), this.config.log.savePath || "./log");
+            const logPath = path.resolve(process.cwd(), this.config.savePath || "./log");
             this.savePath = logPath;
             checkDir(logPath, process.cwd());
         }
@@ -35,7 +34,7 @@ export class Log extends CommonUtils {
         } else if(type === "ERROR") {
             console.error(saveMessage);
         } else if(type === "WARN") {
-            this.config.log?.level === "DEBUG" && console.warn(saveMessage);
+            this.config?.level === "DEBUG" && console.warn(saveMessage);
         } else if(type === "SUCCESS") {
             console.log(saveMessage);
         } else {
@@ -59,7 +58,7 @@ export class Log extends CommonUtils {
         this.log(msg, "SUCCESS");
     }
     private saveToFile(type: TypeLogType,msg: string): void {
-        const shouldSaveToFile = type !== "DEBUG" || (this.config.log?.level === "DEBUG" && type === "DEBUG");
+        const shouldSaveToFile = type !== "DEBUG" || (this.config?.level === "DEBUG" && type === "DEBUG");
         if(this.mode === "node" && shouldSaveToFile) {
             // const fs = require("fs");
             const path = require("path");
@@ -69,13 +68,21 @@ export class Log extends CommonUtils {
             const fileName = this.formatLen(now.getHours(), 2) + ".log";
             const saveFileName = path.resolve(savePath, "./" + fileName);
             checkDir(savePath);
-            const ws: fs.WriteStream = fs.createWriteStream(saveFileName, {
-                encoding: "utf-8",
-                autoClose: true
-            });
-            ws.write(msg + "\r\n", () => {
-                ws.close();
-            });
+            if(fs.existsSync(saveFileName)) {
+                fs.appendFile(saveFileName, msg + "\r\n", (err) => {
+                    if(err) {
+                        console.error(err);
+                    }
+                });
+            } else {
+                const ws = fs.createWriteStream(saveFileName, {
+                    encoding: "utf-8",
+                    autoClose: true
+                });
+                ws.write(msg + "\r\n", () => {
+                    ws.close();
+                });
+            }
         }
     }
 }

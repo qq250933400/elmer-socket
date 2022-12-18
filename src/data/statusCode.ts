@@ -1,0 +1,1 @@
+export const CONST_CLIENT_REFUSED = "ECONNREFUSED";
