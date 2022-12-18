@@ -13,6 +13,11 @@ import {
 } from "../data/const";
 import { Client } from "./Client";
 
+interface IClientInstanceInfo {
+    clientId: string;
+    classId: string;
+}
+
 @AppService
 export class Application {
     @GetConfig<IServerConfig>(CONST_SERVER_CONFIG_FILENAME, CONST_SERVER_CONFIG_INITDATA, ConfigSchema)
@@ -20,6 +25,9 @@ export class Application {
     private socket: WebSocketServer;
 
     private clientPool: any = {};
+    private clients: IClientInstanceInfo[] = [];
+    private isRetry: boolean = false;
+    private retryCount: number = 0;
 
     constructor(
         private log: Log
@@ -33,8 +41,37 @@ export class Application {
         });
         this.socket.on("listening", this.socketListening.bind(this));
         this.socket.on("connection", this.onConnection.bind(this));
+        this.socket.on("error", this.onError.bind(this));
+        this.socket.on("close", this.onClose.bind(this));
+    }
+    private onClose(): void {
+        // release all client
+        this.clients.forEach((info: IClientInstanceInfo) => {
+            const clientId = info.clientId;
+            const clientObj:Client = this.clientPool[clientId];
+            clientObj && this.releaseClient(clientObj);
+        });
+        this.clientPool = {};
+        this.clients = [];
+        if(!this.isRetry) {
+            if(this.retryCount < 10) {
+                this.isRetry = true;
+                const time = setTimeout(() => {
+                    this.socket.removeAllListeners();
+                    this.listen();
+                    clearTimeout(time);
+                }, 3000);
+            } else {
+                this.log.error("尝试重新连接失败。[SEV_RETRY_TIMEOUT]");
+            }
+        }
+    }
+    private onError(err:Error): void {
+        this.log.error(`[${(err as any).code}] ${err.stack}`);
     }
     private socketListening() {
+        this.isRetry = false;
+        this.retryCount = 0;
         this.log.info(`Application running at: ws://${this.config.host}:${this.config.port}`);
     }
     private onConnection(client: WebSocket) {
@@ -56,9 +93,15 @@ export class Application {
             }
             return obj;
         });
+        const clientClassId = Reflect.getMetadata(CONST_DECORATOR_FOR_MODULE_CLASSID, Client);
+        this.clients.push({
+            clientId: requestClientId, // 用于查找Client
+            classId: clientClassId // 用于查找对应的Client instance
+        });
         clientObj.uid = requestClientId;
         clientObj.dispose = this.releaseClient.bind(this);
         clientObj.listen();
+        this.log.info("客户端接入：" + requestClientId);
         return clientObj;
     }
     private releaseClient(client: Client) {

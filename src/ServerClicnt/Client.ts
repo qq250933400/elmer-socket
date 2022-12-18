@@ -14,7 +14,7 @@ export class Client {
         });
         this.socket.addEventListener("close", this.onClose.bind(this));
     }
-    onClose(): void {
+    private onClose(): void {
         this.dispose(this);
     }
 }
