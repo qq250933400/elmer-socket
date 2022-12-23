@@ -12,6 +12,9 @@ import {
     CONST_SERVER_REQUEST_CLIENT_ID
 } from "../data/const";
 import { Client } from "./Client";
+import { MessageHandler } from "./MessageHandler";
+import { IMsgData } from "../data/IMessage";
+import { Store } from "../data/Store";
 
 interface IClientInstanceInfo {
     clientId: string;
@@ -22,6 +25,7 @@ interface IClientInstanceInfo {
 export class Application {
     @GetConfig<IServerConfig>(CONST_SERVER_CONFIG_FILENAME, CONST_SERVER_CONFIG_INITDATA, ConfigSchema)
     ​private​ config: IServerConfig;
+
     private socket: WebSocketServer;
 
     private clientPool: any = {};
@@ -29,12 +33,19 @@ export class Application {
     private isRetry: boolean = false;
     private retryCount: number = 0;
 
+    private controllers: any[] = [];
+
     constructor(
-        private log: Log
+        private log: Log,
+        private msgHandler: MessageHandler,
+        private store: Store
     ) {
         this.log.init();
     }
-    listen() {
+    public storeInit<T={}>(initData:T): void {
+        this.store.storeInit(initData as any);
+    }
+    public listen() {
         this.socket = new WebSocketServer({
             host: this.config.host,
             port: this.config.port
@@ -44,12 +55,30 @@ export class Application {
         this.socket.on("error", this.onError.bind(this));
         this.socket.on("close", this.onClose.bind(this));
     }
+    public controller(Factory: new(...args:any[]) => any): Application {
+        this.controllers.push(Factory);
+        return this;
+    }
+    public sendToAll<T={}>(msgData: {[ P in Exclude<keyof IMsgData<T>, "toUsers"|"fromUser">]: IMsgData<T>[P]}): void {
+        this.clients.forEach((info: IClientInstanceInfo) => {
+            const requestId = info.clientId;
+            const clientId = info.classId;
+            const requestObjs: any = this.clientPool[requestId];
+            const clientObj: Client = requestObjs[clientId];
+            clientObj.send({
+                ...msgData,
+                fromUser: "ApplicationServer"
+            } as any);
+        });
+    }
     private onClose(): void {
         // release all client
         this.clients.forEach((info: IClientInstanceInfo) => {
-            const clientId = info.clientId;
-            const clientObj:Client = this.clientPool[clientId];
-            clientObj && this.releaseClient(clientObj);
+            const requestId = info.clientId;
+            const clientId = info.classId;
+            const requestObjs: any = this.clientPool[requestId];
+            const clientObj: Client = requestObjs[clientId];
+            this.releaseClient(clientObj);
         });
         this.clientPool = {};
         this.clients = [];
@@ -100,6 +129,7 @@ export class Application {
         });
         clientObj.uid = requestClientId;
         clientObj.dispose = this.releaseClient.bind(this);
+        clientObj.msgHandler = this.msgHandler;
         clientObj.listen();
         this.log.info("客户端接入：" + requestClientId);
         return clientObj;

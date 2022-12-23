@@ -1,0 +1,1 @@
+declare var env: "DEV"|"SIT"|"UAT"|"PROD";

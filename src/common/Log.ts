@@ -9,11 +9,14 @@ import * as fs from "fs";
 export type TypeLogType = "ERROR" | "INFO" | "DEBUG" | "WARN" | "SUCCESS";
 
 @AppService
-export class Log extends CommonUtils {
+export class Log {
     @GetConfig(CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA)
     private config: ILogConfig;
     private mode: "node"|"web" = "web";
     private savePath: string;
+    constructor(
+        private com: CommonUtils
+    ) {}
     init() {
         this.mode = this.config?.mode || "web";
         if(this.mode === "node") {
@@ -25,8 +28,8 @@ export class Log extends CommonUtils {
     }
     log(msg: any, type: TypeLogType = "INFO"): void {
         const now = new Date();
-        const dateStr = [this.formatLen(now.getFullYear(), 4), this.formatLen(now.getMonth(), 2), this.formatLen(now.getDate(),2)].join("-");
-        const timeStr = [this.formatLen(now.getHours(), 2), this.formatLen(now.getMinutes(), 2), this.formatLen(now.getSeconds(),2)].join(":");
+        const dateStr = [this.com.formatLen(now.getFullYear(), 4), this.com.formatLen(now.getMonth(), 2), this.com.formatLen(now.getDate(),2)].join("-");
+        const timeStr = [this.com.formatLen(now.getHours(), 2), this.com.formatLen(now.getMinutes(), 2), this.com.formatLen(now.getSeconds(),2)].join(":");
         const dateTimeStr = dateStr + " " + timeStr;
         let saveMessage = `[${type}][${dateTimeStr}] ${msg}`;
         if(type === "INFO") {
@@ -63,9 +66,9 @@ export class Log extends CommonUtils {
             // const fs = require("fs");
             const path = require("path");
             const now = new Date();
-            const dateNow = [this.formatLen(now.getFullYear(), 4), this.formatLen(now.getMonth(), 2), this.formatLen(now.getDate(),2)].join("-");
+            const dateNow = [this.com.formatLen(now.getFullYear(), 4), this.com.formatLen(now.getMonth(), 2), this.com.formatLen(now.getDate(),2)].join("-");
             const savePath = path.resolve(this.savePath, `./${dateNow}`);
-            const fileName = this.formatLen(now.getHours(), 2) + ".log";
+            const fileName = this.com.formatLen(now.getHours(), 2) + ".log";
             const saveFileName = path.resolve(savePath, "./" + fileName);
             checkDir(savePath);
             if(fs.existsSync(saveFileName)) {
