@@ -1,15 +1,19 @@
+import "reflect-metadata";
 import ConfigSchema from "../config/ClientConfig.schema";
 import WSWebSocket from "ws";
 import { AppService, utils } from "elmer-common";
 import {
     CONST_CLIENT_CONFIG_FILENAME,
-    CONST_CLIENT_CONFIG_INITDATA
+    CONST_CLIENT_CONFIG_INITDATA,
+    CONST_MESSAGE_USE_FILTERKEYS
 } from "../data/const";
 import { IClientConfig, TypeENV } from "../config/IClientConfig";
 import { GetConfig } from "../common/decorators";
 import { Log } from "../common/Log";
 import { EnumSocketErrorCode } from "../data/statusCode";
 import { clearInterval } from "timers";
+import { AModel } from "./AModel";
+import { IMsgData } from "../data/IMessage";
 
 interface IWSClientStartOption {
     env: TypeENV,
@@ -32,10 +36,13 @@ export class WSClient {
     // beat
     private beatTimer: NodeJS.Timeout;
     private activeTime: number;
+    // controller
+    private models: any[];
+    private modelPools: any = {};
     constructor(
         private log: Log
     ) {
-        this.log.init();
+        this.models = [];
     }
     start(option: IWSClientStartOption): void {
         const hostValue = utils.getValue(this.config.host, option.env || "PROD");
@@ -48,6 +55,11 @@ export class WSClient {
         this.socket.addEventListener("message", this.onMessage.bind(this));
         this.beatTimer = setInterval(this.beat.bind(this), 1000);
     }
+    useModel<IMsgDataEx={}>(Model: typeof AModel<IMsgDataEx>): WSClient {
+        Model.modelId = utils.guid();
+        this.models.push(Model);
+        return this;
+    }
     private createSocket(connection: string): WebSocket {
         try {
             return new WebSocket(connection);
@@ -59,7 +71,7 @@ export class WSClient {
         const now = Date.now();
         const effectTime = (now - this.activeTime) / 1000;
         if(effectTime > 100) {
-            this.socket.send(`{type:"Beat"}`);
+            this.socket.send(`{"type":"Beat"}`);
             this.activeTime = Date.now();
         }
     }
@@ -71,9 +83,26 @@ export class WSClient {
         this.log.info("Connected");
     }
     private onMessage(event: MessageEvent): void {
+        const msgData = this.decodeData(event.data);
         this.activeTime = Date.now();
-       
-        console.log(event.data, event.type);
+        this.models.forEach((Model: AModel) => {
+            const uid = (Model as any).modelId;
+            const useMessages: string[] = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Model) || [];
+            const obj:AModel = this.modelPools[uid] || new (Model as any)({
+                send: (data: any) => {
+                    this.socket.send(data);
+                }
+            });
+            if(!this.modelPools[uid]) {
+                this.modelPools[uid] = obj;
+            }
+            if(useMessages.includes(msgData.type)) {
+                obj.message({
+                    ...event,
+                    data: msgData
+                });
+            }
+        });
     }
     private onClose(event: CloseEvent): void {
         const code = event.code;
@@ -85,6 +114,12 @@ export class WSClient {
         this.isConnected = false;
         if(this.beatTimer) {
             clearInterval(this.beatTimer);
+        }
+        if(this.modelPools) {
+            Object.keys(this.modelPools).forEach((mdId: string) => {
+                const modelObj: AModel = this.modelPools[mdId];
+                modelObj.close();
+            });
         }
     }
     private onError(err: ErrorEvent): void {
@@ -113,6 +148,15 @@ export class WSClient {
             } else {
                 this.log.info("尝试重新链接失败。[CT_NO_CONFIG]");
             }
+        }
+    }
+    private decodeData(msgData: any): IMsgData​​ {
+        if(utils.isString(msgData)) {
+            return JSON.parse(msgData);
+        } else if(utils.isObject(msgData)) {
+            return msgData as any;
+        } else {
+            return {} as any;
         }
     }
 }

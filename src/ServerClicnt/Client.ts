@@ -35,6 +35,7 @@ export class Client {
                 console.log(event.data, "==========");
             }
         } catch(e) {
+            this.log.debug(event.data);
             this.log.error((e as Error).stack || e.message);
         }
     }

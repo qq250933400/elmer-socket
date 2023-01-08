@@ -13,3 +13,8 @@ export interface IMsgData<T={}, MsgType = keyof (IMsgDataEx & T)> {
     fromUser?: string;
     data: TypeUseData<T & IMsgDataEx, keyof (IMsgDataEx & T)>;
 }
+
+export interface IMsgEvent {
+    onMessage(event: MessageEvent): void;
+    onClose(event: CloseEvent): void;
+}

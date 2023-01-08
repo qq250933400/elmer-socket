@@ -2,6 +2,18 @@ import { checkDir, getFilePath } from "../utils/file";
 import * as path from "path";
 import * as fs from "fs";
 import { ISchemaProperties, getObjFromInstance, Schema } from "elmer-common";
+import { CONST_MESSAGE_USE_FILTERKEYS } from "../data/const";
+
+export const useMessages= <TypeMsg={}>(msgList: (keyof TypeMsg)[]) => {
+    return (Factory: new(...args:any[]) => any) => {
+        const useFav = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Factory);
+        if(useFav) {
+            throw new Error("不允许重复定义message list");
+        } else {
+            Reflect.defineMetadata(CONST_MESSAGE_USE_FILTERKEYS, msgList, Factory);
+        }
+    }
+};
 
 /**
  * 读取配置文件
