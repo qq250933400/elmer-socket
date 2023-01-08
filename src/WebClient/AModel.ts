@@ -18,20 +18,20 @@ export abstract class AModel<TypeMsg={}> {
             this.event.unBind("onClose");
         });
     }
-    on<Name extends keyof IMsgEvent>(eventName: Name, callback: IMsgEvent[Name]): void {
+    public on<Name extends keyof IMsgEvent>(eventName: Name, callback: IMsgEvent[Name]): void {
         if(eventName === "onMessage") {
             this.event.on("onMessage", callback as any);
         } else {
             this.event.on("onClose", callback as any);
         }
     }
-    send<Name extends keyof TypeMsg>(data: Omit<IMsgData​​<TypeMsg[Name]>, "fromUser">): Promise<any> {
+    public send<Name extends keyof TypeMsg>(data: Omit<IMsgData<TypeMsg[Name]>, "fromUser">): Promise<any> {
         return this.option.send(data);
     }
-    close(): void {
+    protected close(): void {
         this.event.emit("onClose");
     }
-    message(event: MessageEvent): void {
+    protected message(event: MessageEvent): void {
         this.event.emit("onMessage", event);
     }
 }

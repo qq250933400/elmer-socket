@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import ConfigSchema from "../config/ClientConfig.schema";
 import WSWebSocket from "ws";
-import { AppService, utils } from "elmer-common";
+import { AppService, utils, Observe, getObjFromInstance } from "elmer-common";
 import {
     CONST_CLIENT_CONFIG_FILENAME,
     CONST_CLIENT_CONFIG_INITDATA,
@@ -14,6 +14,7 @@ import { EnumSocketErrorCode } from "../data/statusCode";
 import { clearInterval } from "timers";
 import { AModel } from "./AModel";
 import { IMsgData } from "../data/IMessage";
+import { CommonUtils } from "../utils/CommonUtils";
 
 interface IWSClientStartOption {
     env: TypeENV,
@@ -21,7 +22,7 @@ interface IWSClientStartOption {
 }
 
 @AppService
-export class WSClient {
+export class WSClient<UseModel={}> {
     /** 是否已连接到服务器 */
     public isConnected: boolean = false;
 
@@ -39,12 +40,17 @@ export class WSClient {
     // controller
     private models: any[];
     private modelPools: any = {};
+    private isUseModelCalled?: boolean = false;
+    // event handler
+    private event: Observe<any>;
     constructor(
-        private log: Log
+        private log: Log,
+        private com: CommonUtils
     ) {
         this.models = [];
+        this.event = new Observe<any>();
     }
-    start(option: IWSClientStartOption): void {
+    start(option: IWSClientStartOption): Exclude<WSClient<UseModel>, "useModel" | "send" | "start"> {
         const hostValue = utils.getValue(this.config.host, option.env || "PROD");
         const connectionString = `ws://${hostValue}:${this.config.port}`;
         this.startOption = option;
@@ -54,11 +60,70 @@ export class WSClient {
         this.socket.addEventListener("close", this.onClose.bind(this));
         this.socket.addEventListener("message", this.onMessage.bind(this));
         this.beatTimer = setInterval(this.beat.bind(this), 1000);
-    }
-    useModel<IMsgDataEx={}>(Model: typeof AModel<IMsgDataEx>): WSClient {
-        Model.modelId = utils.guid();
-        this.models.push(Model);
         return this;
+    }
+    /**
+     * 装载使用模块
+     * @param models - 模块配置
+     * @returns 
+     */
+    model(models: {[P in keyof UseModel]: new(...args:any) => any}): Exclude<WSClient<UseModel>, "model"> {
+        if(this.isUseModelCalled) {
+            this.log.error("useModel方法不允许重复调用");
+        } else {
+            models && Object.keys(models as any).forEach((mKey: string) => {
+                const ModelFactory = (models as any)[mKey];
+                ModelFactory.invokeName = mKey;
+                ModelFactory.modelId = utils.guid();
+                AppService(ModelFactory);
+                this.models.push(ModelFactory);
+            });
+        }
+        return this;
+    }
+    send<T={}>(data: IMsgData<T>): Promise<any> {
+        return new Promise((resolve)=>{
+            if(data.type === "binary" || data.type === "blob") {
+                const packData = this.com.encodeMsgPackage(data, null, false);
+                this.socket.send(packData);
+            } else {
+                this.socket.send(JSON.stringify(data));
+            }
+            resolve({});
+        });
+    }
+    ready(fn: Function): void {
+        this.event.on("onReady", fn);
+    }
+    dispose(): void {
+        this.socket.close(1, "Client was closed by user.");
+    }
+    invoke<NM extends keyof UseModel, T={}>(model: NM, fnName: keyof UseModel[NM], ...args: any[]): T|null|undefined {
+        let modelObj: any;
+        for(const modelFactory of this.models) {
+            if(modelFactory.invokeName === model) {
+                modelObj = getObjFromInstance(modelFactory, this);
+                const uid = (modelFactory as any).modelId;
+                if(!this.modelPools[uid]) {
+                    this.mountModel(modelObj);
+                    this.modelPools[uid] = uid;
+                }
+                break;
+            }
+        }
+        console.log(modelObj, "-----");
+        if(!modelObj) {
+            throw new Error("未找到调用模块。");
+        }
+        if(typeof modelObj[fnName] === "function") {
+            return modelObj[fnName].apply(modelObj, args);
+        }
+        return undefined;
+    }
+    private mountModel(modelObj: any): void {
+        modelObj.option = {
+            send: this.send.bind(this)
+        };
     }
     private createSocket(connection: string): WebSocket {
         try {
@@ -81,6 +146,7 @@ export class WSClient {
         this.isRetryConnect = false;
         this.isConnected = true;
         this.log.info("Connected");
+        this.event.emit("onReady");
     }
     private onMessage(event: MessageEvent): void {
         const msgData = this.decodeData(event.data);
@@ -88,16 +154,13 @@ export class WSClient {
         this.models.forEach((Model: AModel) => {
             const uid = (Model as any).modelId;
             const useMessages: string[] = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Model) || [];
-            const obj:AModel = this.modelPools[uid] || new (Model as any)({
-                send: (data: any) => {
-                    this.socket.send(data);
-                }
-            });
+            const obj:AModel = getObjFromInstance(Model as any, this);
             if(!this.modelPools[uid]) {
+                this.mountModel(obj);
                 this.modelPools[uid] = obj;
             }
-            if(useMessages.includes(msgData.type)) {
-                obj.message({
+            if(useMessages.includes(msgData.type) || useMessages.length <= 0) {
+                (obj as any).message({
                     ...event,
                     data: msgData
                 });
@@ -118,7 +181,7 @@ export class WSClient {
         if(this.modelPools) {
             Object.keys(this.modelPools).forEach((mdId: string) => {
                 const modelObj: AModel = this.modelPools[mdId];
-                modelObj.close();
+                (modelObj as any).close();
             });
         }
     }
@@ -150,7 +213,7 @@ export class WSClient {
             }
         }
     }
-    private decodeData(msgData: any): IMsgData​​ {
+    private decodeData(msgData: any): IMsgData {
         if(utils.isString(msgData)) {
             return JSON.parse(msgData);
         } else if(utils.isObject(msgData)) {

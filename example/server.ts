@@ -15,6 +15,7 @@ setTimeout(() => {
             name: "string"
         }
     });
+    console.log("----Send to All");
     app.sendToAll({
         type: "text",
         data: "ssss"
