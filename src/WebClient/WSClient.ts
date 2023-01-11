@@ -111,7 +111,6 @@ export class WSClient<UseModel={}> {
                 break;
             }
         }
-        console.log(modelObj, "-----");
         if(!modelObj) {
             throw new Error("未找到调用模块。");
         }

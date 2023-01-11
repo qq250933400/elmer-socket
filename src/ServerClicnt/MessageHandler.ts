@@ -8,6 +8,7 @@ import { CommonUtils } from "../utils/CommonUtils";
 @AppService
 export class MessageHandler {
     public socketServer!: WebSocketServer;
+    public getModel!: <T={}>(Factory: new(...args:[]) => {}) => T;
     constructor(
         private log: Log,
         private com: CommonUtils

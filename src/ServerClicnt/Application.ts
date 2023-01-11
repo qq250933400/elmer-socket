@@ -22,7 +22,7 @@ interface IClientInstanceInfo {
 }
 
 @AppService
-export class Application {
+export class Application<UseModel={}> {
     @GetConfig<IServerConfig>(CONST_SERVER_CONFIG_FILENAME, CONST_SERVER_CONFIG_INITDATA, ConfigSchema)
     ​private​ config: IServerConfig;
 
@@ -32,8 +32,10 @@ export class Application {
     private clients: IClientInstanceInfo[] = [];
     private isRetry: boolean = false;
     private retryCount: number = 0;
-
-    private controllers: any[] = [];
+     // controller
+     private models: any[];
+     private modelPools: any = {};
+     private isUseModelCalled?: boolean = false;
 
     constructor(
         private log: Log,
@@ -41,6 +43,8 @@ export class Application {
         private store: Store
     ) {
         this.log.init();
+        this.models = [];
+        this.msgHandler.getModel = this.getModelInstance.bind(this);
     }
     public storeInit<T={}>(initData:T): void {
         this.store.storeInit(initData as any);
@@ -55,9 +59,43 @@ export class Application {
         this.socket.on("error", this.onError.bind(this));
         this.socket.on("close", this.onClose.bind(this));
     }
-    public controller(Factory: new(...args:any[]) => any): Application {
-        this.controllers.push(Factory);
+    /**
+     * 装载使用模块
+     * @param models - 模块配置
+     * @returns 
+     */
+    public useModel(models: {[P in keyof UseModel]: new(...args:any) => any}): Exclude<Application<UseModel>, "model"> {
+        if(this.isUseModelCalled) {
+            this.log.error("useModel方法不允许重复调用");
+        } else {
+            models && Object.keys(models as any).forEach((mKey: string) => {
+                const ModelFactory = (models as any)[mKey];
+                ModelFactory.invokeName = mKey;
+                ModelFactory.modelId = utils.guid();
+                AppService(ModelFactory);
+                this.models.push(ModelFactory);
+            });
+        }
         return this;
+    }
+    invoke<NM extends keyof UseModel, T={}>(
+        model: NM, fnName: Exclude<keyof UseModel[NM], "onMessage"|"options"|"sendToAll">, ...args: any[]): T|null|undefined {
+        let modelObj: any;
+        console.log("-------", this.models);
+        for(const modelFactory of this.models) {
+            if(modelFactory.invokeName === model) {
+                console.log("-----match--", modelFactory);
+                modelObj = this.getModelInstance(modelFactory);
+                break;
+            }
+        }
+        if(!modelObj) {
+            throw new Error("未找到调用模块。");
+        }
+        if(typeof modelObj[fnName] === "function") {
+            return modelObj[fnName].apply(modelObj, args);
+        }
+        return undefined;
     }
     public sendToAll<T={}>(msgData: {[ P in Exclude<keyof IMsgData<T>, "toUsers"|"fromUser">]: IMsgData<T>[P]}): void {
         this.clients.forEach((info: IClientInstanceInfo) => {
@@ -70,6 +108,20 @@ export class Application {
                 fromUser: "ApplicationServer"
             } as any);
         });
+    }
+    private getModelInstance(modelFactory: new(...args:any[])=>any): void {
+        const modelObj = getObjFromInstance(modelFactory, this);
+        const uid = (modelFactory as any).modelId;
+        if(!this.modelPools[uid]) {
+            this.mountModel(modelObj);
+            this.modelPools[uid] = uid;
+        }
+        return modelObj;
+    }
+    private mountModel(modelObj: any): void {
+        modelObj.options = {
+            sendToAll: this.sendToAll.bind(this)
+        };
     }
     private onClose(): void {
         // release all client
