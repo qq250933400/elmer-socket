@@ -1,6 +1,6 @@
 import { checkDir, getFilePath } from "../utils/file";
-import * as path from "path";
-import * as fs from "fs";
+// import * as path from "path";
+// import * as fs from "fs";
 import { ISchemaProperties, getObjFromInstance, Schema } from "elmer-common";
 import { CONST_MESSAGE_USE_FILTERKEYS } from "../data/const";
 
@@ -23,6 +23,7 @@ export const useMessages= <TypeMsg={}>(msgList: (keyof TypeMsg)[]) => {
  */
 export const GetConfig = <T={}>(fileName: string, initData?: Partial<T>, schema?: ISchemaProperties<any>):Function => {
     return (target: any, attr: string):T => {
+        const path = require("path"), fs = require("fs");
         const configFileName = path.resolve(process.cwd(), "./config/" + fileName);
         const schemaObj: Schema = getObjFromInstance(Schema, target)
         if(fs.existsSync(configFileName)) {

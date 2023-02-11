@@ -1,4 +1,4 @@
-import *  as fs from "fs";
+// import *  as fs from "fs";
 import { utils } from "elmer-common";
 
 /**
@@ -23,6 +23,7 @@ export const checkDir = (checkPath: string, securityPath?: string): void => {
     if(!utils.isEmpty(securityPath)  && secPath !== resPath.substr(0, secPath.length)) {
         throw new Error("没有权限创建目录");
     } else {
+        const fs = require("fs");
         let fPath = "";
         let fIndex = 0;
         while(fIndex < resArr.length) {

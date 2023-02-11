@@ -6,7 +6,7 @@ type TypeAppModel = {
     sev: SevController;
 };
 
-const app = createInstance(Application<TypeAppModel>);
+const app: Application<TypeAppModel> = createInstance(Application<TypeAppModel>);
 
 app.useModel({
     sev: SevController

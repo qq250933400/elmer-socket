@@ -20,7 +20,7 @@ class UserModel extends AModel<IChat> {
         })
     }
 }
-
+// 
 type TypeUseModel = {
     client: ClientModel;
     user: UserModel;

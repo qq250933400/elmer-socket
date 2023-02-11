@@ -1,6 +1,6 @@
 interface IMsgDataEx {
     text: string,
-    binary: BinaryData,
+    binary: ArrayBuffer,
     blob: Blob;
     Beat: string;
 }

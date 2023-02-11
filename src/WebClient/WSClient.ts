@@ -35,7 +35,7 @@ export class WSClient<UseModel={}> {
     private retryCount: number = 0;
     
     // beat
-    private beatTimer: NodeJS.Timeout;
+    private beatTimer: any;
     private activeTime: number;
     // controller
     private models: any[];

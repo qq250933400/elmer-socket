@@ -4,7 +4,7 @@ import { GetConfig } from "./decorators";
 import { CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA } from "../data/const";
 import { ILogConfig } from "../config/ILogConfig";
 import { checkDir } from "../utils/file";
-import * as fs from "fs";
+// import * as fs from "fs";
 
 export type TypeLogType = "ERROR" | "INFO" | "DEBUG" | "WARN" | "SUCCESS";
 
@@ -63,7 +63,7 @@ export class Log {
     private saveToFile(type: TypeLogType,msg: string): void {
         const shouldSaveToFile = type !== "DEBUG" || (this.config?.level === "DEBUG" && type === "DEBUG");
         if(this.mode === "node" && shouldSaveToFile) {
-            // const fs = require("fs");
+            const fs = require("fs");
             const path = require("path");
             const now = new Date();
             const dateNow = [this.com.formatLen(now.getFullYear(), 4), this.com.formatLen(now.getMonth(), 2), this.com.formatLen(now.getDate(),2)].join("-");
@@ -72,7 +72,7 @@ export class Log {
             const saveFileName = path.resolve(savePath, "./" + fileName);
             checkDir(savePath);
             if(fs.existsSync(saveFileName)) {
-                fs.appendFile(saveFileName, msg + "\r\n", (err) => {
+                fs.appendFile(saveFileName, msg + "\r\n", (err: any) => {
                     if(err) {
                         console.error(err);
                     }

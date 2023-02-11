@@ -1,6 +1,6 @@
 import axios, { AxiosBasicCredentials } from "axios";
 import { utils, Service } from "elmer-common";
-import { getServiceObj } from "elmer-common/lib/decorators/Autowired";
+// import { getServiceObj } from "elmer-common/lib/decorators/Autowired";
 
 type TypeENV = {
     host: string;
@@ -126,6 +126,7 @@ export class ElmerService {
                 return endPoint;
             }
         }
+        return undefined;
     }
     getUrl(endPointId: string): string|undefined|null {
         const endPoint = this.getEndPoint(endPointId);
@@ -237,51 +238,51 @@ export class ElmerService {
     }
 }
 
-export const GetUrl = (endPoint: string) => {
-    return (target: any, attr: string): any => {
-        const obj = getServiceObj<ElmerService>(ElmerService);
-        const myUrl = obj.getUrl(endPoint);
-        if(target) {
-            Object.defineProperty(target, attr, {
-                get: () => myUrl,
-                set: () => {throw new Error(`The property of ${attr} cannot be modified directly.`);}
-            });
-        }
-        return myUrl;
-    };
-};
+// export const GetUrl = (endPoint: string) => {
+//     return (target: any, attr: string): any => {
+//         const obj = getServiceObj<ElmerService>(ElmerService);
+//         const myUrl = obj.getUrl(endPoint);
+//         if(target) {
+//             Object.defineProperty(target, attr, {
+//                 get: () => myUrl,
+//                 set: () => {throw new Error(`The property of ${attr} cannot be modified directly.`);}
+//             });
+//         }
+//         return myUrl;
+//     };
+// };
 
-export const GetEndPoint= (endPoint: string) => {
-    return (target: any, attr: string): any => {
-        const obj = getServiceObj<ElmerService>(ElmerService);
-        const myEndPoint = obj.getEndPoint(endPoint);
-        if(target) {
-            Object.defineProperty(target, attr, {
-                get: () => myEndPoint,
-                set: () => {throw new Error(`The property of ${attr} cannot be modified directly.`);}
-            });
-        }
-        return myEndPoint;
-    };
-};
+// export const GetEndPoint= (endPoint: string) => {
+//     return (target: any, attr: string): any => {
+//         const obj = getServiceObj<ElmerService>(ElmerService);
+//         const myEndPoint = obj.getEndPoint(endPoint);
+//         if(target) {
+//             Object.defineProperty(target, attr, {
+//                 get: () => myEndPoint,
+//                 set: () => {throw new Error(`The property of ${attr} cannot be modified directly.`);}
+//             });
+//         }
+//         return myEndPoint;
+//     };
+// };
 
-export const SetServiceConfig = <T={}>() => {
-    return (target: any, attr: string, defaultValue?: TypeServiceConfig<T>): any => {
-        const obj = getServiceObj<ElmerService>(ElmerService);
-        obj.setConfig(defaultValue as any);
-        if(target) {
-            Object.defineProperty(target, attr, {
-                get: () => defaultValue,
-                set: () => {throw new Error(`The property of ${attr} cannot be modified directly.`);}
-            });
-        }
-    };
-};
+// export const SetServiceConfig = <T={}>() => {
+//     return (target: any, attr: string, defaultValue?: TypeServiceConfig<T>): any => {
+//         const obj = getServiceObj<ElmerService>(ElmerService);
+//         obj.setConfig(defaultValue as any);
+//         if(target) {
+//             Object.defineProperty(target, attr, {
+//                 get: () => defaultValue,
+//                 set: () => {throw new Error(`The property of ${attr} cannot be modified directly.`);}
+//             });
+//         }
+//     };
+// };
 
-export const SetServiceNamespace = (namespace: string) => {
-    return (target: any, attr: string, descriptor: PropertyDescriptor): any => {
-        const obj = getServiceObj<ElmerService>(ElmerService);
-        const configData = descriptor.value();
-        obj.setNamespace(namespace, configData);
-    };
-};
+// export const SetServiceNamespace = (namespace: string) => {
+//     return (target: any, attr: string, descriptor: PropertyDescriptor): any => {
+//         const obj = getServiceObj<ElmerService>(ElmerService);
+//         const configData = descriptor.value();
+//         obj.setNamespace(namespace, configData);
+//     };
+// };
