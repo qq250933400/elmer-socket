@@ -35,7 +35,8 @@
     "config",
     "example",
     "log",
-    "mochawesome-report"
+    "mochawesome-report",
+    "/node_modules/**/*.d.ts"
   ],
   "include": [
     "./src/**/*.tsx",
