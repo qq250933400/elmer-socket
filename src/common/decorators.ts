@@ -1,8 +1,9 @@
 import { checkDir, getFilePath } from "../utils/file";
 // import * as path from "path";
 // import * as fs from "fs";
-import { ISchemaProperties, getObjFromInstance, Schema } from "elmer-common";
+import { getObjFromInstance, Schema } from "elmer-common";
 import { CONST_MESSAGE_USE_FILTERKEYS } from "../data/const";
+import { ISchemaConfig } from "../config/ISchameConfig";
 
 export const useMessages= <TypeMsg={}>(msgList: (keyof TypeMsg)[]) => {
     return (Factory: new(...args:any[]) => any) => {
@@ -15,13 +16,14 @@ export const useMessages= <TypeMsg={}>(msgList: (keyof TypeMsg)[]) => {
     }
 };
 
+
 /**
  * 读取配置文件
  * @param fileName - 配置文件相对路径 
  * @param initData - 默认参数，当配置文件不存在时将会使用此数据并生成配置文件
  * @returns 
  */
-export const GetConfig = <T={}>(fileName: string, initData?: Partial<T>, schema?: ISchemaProperties<any>):Function => {
+export const GetConfig = <T={}>(fileName: string, initData?: Partial<T>, schema?: ISchemaConfig<any>):Function => {
     return (target: any, attr: string):T => {
         const path = require("path"), fs = require("fs");
         const configFileName = path.resolve(process.cwd(), "./config/" + fileName);

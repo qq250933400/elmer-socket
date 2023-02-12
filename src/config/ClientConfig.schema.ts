@@ -1,18 +1,20 @@
-import { ISchemaProperties } from "elmer-common/lib/Validation/Schema";
+import { ISchemaConfig } from "./ISchameConfig";
 import { IClientConfig } from "./IClientConfig";
 
 export default {
-    host: {
-        type: "Object",
-        properties: {
-            "DEV": {
-                type: "String",
-                defaultValue: "localhost"
+    properties: {
+        host: {
+            type: "Object",
+            properties: {
+                "DEV": {
+                    type: "String",
+                    defaultValue: "localhost"
+                }
             }
+        },
+        port: {
+            type: "Number",
+            isRequired: true
         }
-    },
-    port: {
-        type: "Number",
-        isRequired: true
     }
-} as ISchemaProperties<IClientConfig>;
+} as ISchemaConfig<IClientConfig>;

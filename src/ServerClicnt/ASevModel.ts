@@ -2,6 +2,7 @@ import { IMsgData } from "../data/IMessage";
 
 interface IServerModelOption {
     sendToAll: <T={}>(msgData: IMsgData​<T>​) => Promise<any>;
+    sendTo: <T={}>(toUsers: string[], msgData: IMsgData<T>) => Promise<any>;
 }
 export abstract class ASevModel<IMsgDataStruct={}> {
     protected options!: IServerModelOption;

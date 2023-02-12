@@ -3,6 +3,11 @@ import { MessageHandler } from "./MessageHandler";
 import { IMsgData } from "../data/IMessage";
 import { Log } from "../common/Log";
 
+export interface IClientInstanceInfo {
+    clientId: string;
+    classId: string;
+}
+
 @RequestService
 export class Client {
     public uid!: string;
@@ -29,7 +34,7 @@ export class Client {
             if(utils.isString(event.data)) {
                 const jsonData: IMsgData = JSON.parse(event.data);
                 if(jsonData.type !== "Beat") {
-                    this.msgHandler.onMessage(this.uid, jsonData);
+                    this.msgHandler.onMessage(this.uid, jsonData, event);
                 }
             } else {
                 console.log(event.data, "==========");

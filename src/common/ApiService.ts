@@ -64,7 +64,7 @@ export type TypeServiceSendOptions = {
 };
 
 @Service
-export class ElmerService {
+export class ApiService {
     private config: {[P in keyof TypeServiceConfig<any>]?: TypeServiceConfig<any>[P]} = {};
     private env: String;
     constructor() {

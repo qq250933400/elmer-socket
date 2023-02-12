@@ -1,30 +1,33 @@
 import "reflect-metadata";
 import ConfigSchema from "../config/ServerConfig.schema";
+import ApiConfigSchema from "../config/ApiConfig.schema";
 import { CONST_DECORATOR_FOR_MODULE_CLASSID } from "elmer-common/lib/decorators/const";
 import { GetConfig } from "../common/decorators";
 import { IServerConfig } from "../config/IServerConfig";
+import { TypeServiceConfig } from "../common/ApiService";
 import { AppService, getObjFromInstance, utils } from "elmer-common";
 import { Server as WebSocketServer } from "ws";
 import { Log } from "../common/Log";
 import {
     CONST_SERVER_CONFIG_INITDATA,
     CONST_SERVER_CONFIG_FILENAME,
-    CONST_SERVER_REQUEST_CLIENT_ID
+    CONST_SERVER_REQUEST_CLIENT_ID,
+    CONST_API_CONFIG_FILENAME,
 } from "../data/const";
-import { Client } from "./Client";
+import { Client, IClientInstanceInfo } from "./Client";
 import { MessageHandler } from "./MessageHandler";
 import { IMsgData } from "../data/IMessage";
 import { Store } from "../data/Store";
+import { ApiService } from "../common/ApiService";
 
-interface IClientInstanceInfo {
-    clientId: string;
-    classId: string;
-}
+
 
 @AppService
 export class Application<UseModel={}> {
     @GetConfig<IServerConfig>(CONST_SERVER_CONFIG_FILENAME, CONST_SERVER_CONFIG_INITDATA, ConfigSchema)
     ​private​ config: IServerConfig;
+    @GetConfig<TypeServiceConfig>(CONST_API_CONFIG_FILENAME, {}, ApiConfigSchema)
+    ​private​ apiConfig: TypeServiceConfig;
 
     private socket: WebSocketServer;
 
@@ -40,11 +43,17 @@ export class Application<UseModel={}> {
     constructor(
         private log: Log,
         private msgHandler: MessageHandler,
-        private store: Store
+        private store: Store,
+        private service: ApiService
     ) {
         this.log.init();
         this.models = [];
         this.msgHandler.getModel = this.getModelInstance.bind(this);
+        this.msgHandler.getAllModel = () => this.models;
+        this.msgHandler.getClients = () => this.clients;
+        this.msgHandler.sendToEx = this.sendTo.bind(this);
+        this.msgHandler.sendToAllEx = this.sendToAll.bind(this);
+        this.service.setConfig(this.apiConfig);
     }
     public storeInit<T={}>(initData:T): void {
         this.store.storeInit(initData as any);
@@ -81,10 +90,8 @@ export class Application<UseModel={}> {
     invoke<NM extends keyof UseModel, T={}>(
         model: NM, fnName: Exclude<keyof UseModel[NM], "onMessage"|"options"|"sendToAll">, ...args: any[]): T|null|undefined {
         let modelObj: any;
-        console.log("-------", this.models);
         for(const modelFactory of this.models) {
             if(modelFactory.invokeName === model) {
-                console.log("-----match--", modelFactory);
                 modelObj = this.getModelInstance(modelFactory);
                 break;
             }
@@ -109,6 +116,20 @@ export class Application<UseModel={}> {
             } as any);
         });
     }
+    public sendTo<T={}>(toUsers: string[], msgData: {[ P in Exclude<keyof IMsgData<T>, "toUsers">]: IMsgData<T>[P]}): void {
+        this.clients.forEach((info: IClientInstanceInfo) => {
+            const requestId = info.clientId;
+            const clientId = info.classId;
+            if(toUsers.includes(clientId)) {
+                const requestObjs: any = this.clientPool[requestId];
+                const clientObj: Client = requestObjs[clientId];
+                clientObj.send({
+                    ...msgData,
+                    fromUser: "ApplicationServer"
+                } as any);
+            }
+        });
+    }
     private getModelInstance(modelFactory: new(...args:any[])=>any): void {
         const modelObj = getObjFromInstance(modelFactory, this);
         const uid = (modelFactory as any).modelId;
@@ -120,7 +141,8 @@ export class Application<UseModel={}> {
     }
     private mountModel(modelObj: any): void {
         modelObj.options = {
-            sendToAll: this.sendToAll.bind(this)
+            sendToAll: this.sendToAll.bind(this),
+            sendTo: this.sendTo.bind(this)
         };
     }
     private onClose(): void {

@@ -153,12 +153,12 @@ export class WSClient<UseModel={}> {
         this.models.forEach((Model: AModel) => {
             const uid = (Model as any).modelId;
             const useMessages: string[] = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Model) || [];
-            const obj:AModel = getObjFromInstance(Model as any, this);
-            if(!this.modelPools[uid]) {
-                this.mountModel(obj);
-                this.modelPools[uid] = obj;
-            }
             if(useMessages.includes(msgData.type) || useMessages.length <= 0) {
+                const obj:AModel = getObjFromInstance(Model as any, this);
+                if(!this.modelPools[uid]) {
+                    this.mountModel(obj);
+                    this.modelPools[uid] = obj;
+                }
                 (obj as any).message({
                     ...event,
                     data: msgData

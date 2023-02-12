@@ -10,7 +10,6 @@ interface IMsgData {
 export class SevController extends ASevModel<IMsgData> {
     public onMessage?(event: MessageEvent<IMsgData>): void {
        console.log(event.data, "--------onController---Server side");
-        throw new Error("Method not implemented.");
     }
     init(): void {
         this.sendToAll({

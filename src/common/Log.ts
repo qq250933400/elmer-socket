@@ -4,13 +4,14 @@ import { GetConfig } from "./decorators";
 import { CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA } from "../data/const";
 import { ILogConfig } from "../config/ILogConfig";
 import { checkDir } from "../utils/file";
+import LogConfigSchema from "../config/LogConfig.schema";
 // import * as fs from "fs";
 
 export type TypeLogType = "ERROR" | "INFO" | "DEBUG" | "WARN" | "SUCCESS";
 
 @AppService
 export class Log {
-    @GetConfig(CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA)
+    @GetConfig(CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA, LogConfigSchema)
     private config: ILogConfig;
     private mode: "node"|"web" = "web";
     private savePath: string;

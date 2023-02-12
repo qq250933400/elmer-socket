@@ -28,6 +28,9 @@ export const CONST_LOG_CONFIG_INITDATA = {
     mode: "web"
 } as ILogConfig;
 
+export const CONST_API_CONFIG_FILENAME = "config.api.json";
+
+
 export const CONST_SERVER_REQUEST_CLIENT_ID = "WS_SEV_CLIENT_ID";
 
 export const CONST_MESSAGE_USE_FILTERKEYS = "WS_CLIENT_FILTER_KEY";
