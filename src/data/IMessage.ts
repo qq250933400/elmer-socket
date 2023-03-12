@@ -22,5 +22,6 @@ export interface IMsgEvent {
 export interface IServerClientData {
     socket: WebSocket;
     ip: string;
+    uid: string;
     close: Function;
 }

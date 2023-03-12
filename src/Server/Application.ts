@@ -35,9 +35,10 @@ export class Application<UseModel={}> {
     private isRetry: boolean = false;
     private retryCount: number = 0;
      // controller
-     private models: any[];
-     private modelPools: any = {};
-     private isUseModelCalled?: boolean = false;
+    private models: any[];
+    private modelPools: any = {};
+    private isUseModelCalled?: boolean = false;
+    private onReadyEvent?: Function;
 
     constructor(
         private log: Log,
@@ -66,6 +67,10 @@ export class Application<UseModel={}> {
         this.socket.on("connection", this.onConnection.bind(this));
         this.socket.on("error", this.onError.bind(this));
         this.socket.on("close", this.onClose.bind(this));
+    }
+    public ready(fn: Function) {
+        this.onReadyEvent = fn;
+        return this;
     }
     /**
      * 装载使用模块
@@ -175,6 +180,7 @@ export class Application<UseModel={}> {
         this.isRetry = false;
         this.retryCount = 0;
         this.log.info(`Application running at: ws://${this.config.host}:${this.config.port}`);
+        typeof this.onReadyEvent === "function" && this.onReadyEvent.call(this);
     }
     private onConnection(client: WebSocket, req: any) {
         const requestClientId = "ws_sev_req_" + utils.guid();

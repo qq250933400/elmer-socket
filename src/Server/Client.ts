@@ -38,6 +38,7 @@ export class Client {
                     this.msgHandler.onMessage(this.uid, jsonData, event, {
                         socket: this.socket,
                         ip: this.ip,
+                        uid: this.uid,
                         close: (message: string) => {
                             message && this.log.info("客户端被断开：" + message);
                             this.socket.close();
