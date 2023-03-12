@@ -21,7 +21,6 @@ import { Store } from "../data/Store";
 import { ApiService } from "../common/ApiService";
 
 
-
 @AppService
 export class Application<UseModel={}> {
     @GetConfig<IServerConfig>(CONST_SERVER_CONFIG_FILENAME, CONST_SERVER_CONFIG_INITDATA, ConfigSchema)
@@ -177,8 +176,9 @@ export class Application<UseModel={}> {
         this.retryCount = 0;
         this.log.info(`Application running at: ws://${this.config.host}:${this.config.port}`);
     }
-    private onConnection(client: WebSocket) {
+    private onConnection(client: WebSocket, req: any) {
         const requestClientId = "ws_sev_req_" + utils.guid();
+        const requestClientIp = req.connection?.remoteAddress;
         const clientObj: Client = getObjFromInstance(Client, this, (Factory: new(...args:any[]) => any, opt) => {
             const classId = opt.uid;
             let requestPool = this.clientPool[requestClientId];
@@ -204,6 +204,7 @@ export class Application<UseModel={}> {
         clientObj.uid = requestClientId;
         clientObj.dispose = this.releaseClient.bind(this);
         clientObj.msgHandler = this.msgHandler;
+        clientObj.ip = requestClientIp;
         clientObj.listen();
         this.log.info("客户端接入：" + requestClientId);
         return clientObj;

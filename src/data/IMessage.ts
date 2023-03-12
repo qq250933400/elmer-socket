@@ -18,3 +18,9 @@ export interface IMsgEvent {
     onMessage(event: MessageEvent): void;
     onClose(event: CloseEvent): void;
 }
+
+export interface IServerClientData {
+    socket: WebSocket;
+    ip: string;
+    close: Function;
+}

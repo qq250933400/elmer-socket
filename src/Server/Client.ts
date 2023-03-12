@@ -14,6 +14,7 @@ export class Client {
     public dispose!: Function;
     public socket!: WebSocket;
     public msgHandler!: MessageHandler;
+    public ip!: string;
     constructor(
         private log: Log
     ) {
@@ -34,7 +35,15 @@ export class Client {
             if(utils.isString(event.data)) {
                 const jsonData: IMsgData = JSON.parse(event.data);
                 if(jsonData.type !== "Beat") {
-                    this.msgHandler.onMessage(this.uid, jsonData, event);
+                    this.msgHandler.onMessage(this.uid, jsonData, event, {
+                        socket: this.socket,
+                        ip: this.ip,
+                        close: (message: string) => {
+                            message && this.log.info("客户端被断开：" + message);
+                            this.socket.close();
+                            this.onClose.bind(this);
+                        }
+                    });
                 }
             } else {
                 console.log(event.data, "==========");

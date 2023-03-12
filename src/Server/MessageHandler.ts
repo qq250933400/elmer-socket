@@ -1,11 +1,12 @@
 import { AppService } from "elmer-common";
 import { Server as WebSocketServer } from "ws";
 import { Client, IClientInstanceInfo } from "./Client";
-import { IMsgData } from "../data/IMessage";
+import { IMsgData, IServerClientData } from "../data/IMessage";
 import { Log } from "../common/Log";
 import { CommonUtils } from "../utils/CommonUtils";
 import { ASevModel } from "./ASevModel";
 import { CONST_MESSAGE_USE_FILTERKEYS } from "../data/const";
+
 
 @AppService
 export class MessageHandler {
@@ -33,14 +34,14 @@ export class MessageHandler {
             client.socket.send(JSON.stringify(data));
         }
     }
-    public onMessage<T={}>(clientId: string, msgData: IMsgData<T>, event: MessageEvent): void {
+    public onMessage<T={}>(clientId: string, msgData: IMsgData<T>, event: MessageEvent, info: IServerClientData): void {
         const AllModels = this.getAllModel();
         AllModels.forEach((Model: ASevModel) => {
             const useMessages: any[] = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Model) || [];
             if(useMessages.includes(msgData.type) || useMessages.length <= 0) {
                 const obj: any = this.getModel(Model as any);
                 if(typeof obj.onMessage === "function") {
-                    obj.onMessage({ ...event, data: { ...msgData, fromUser: clientId } });
+                    obj.onMessage({ ...event, data: { ...msgData, fromUser: clientId }, dataType: msgData.type}, info);
                 } else {
                     if(useMessages.length > 0) {
                         this.log.error(`Model未实现onMessage方法。（${(Model as any).name}）`);

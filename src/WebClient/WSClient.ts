@@ -180,7 +180,7 @@ export class WSClient<UseModel={}> {
         if(this.modelPools) {
             Object.keys(this.modelPools).forEach((mdId: string) => {
                 const modelObj: AModel = this.modelPools[mdId];
-                (modelObj as any).close();
+                modelObj && typeof (modelObj as any).close === "function" && (modelObj as any).close();
             });
         }
     }
