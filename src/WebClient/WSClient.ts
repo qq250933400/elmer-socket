@@ -53,6 +53,7 @@ export class WSClient<UseModel={}> {
     start(option: IWSClientStartOption): Exclude<WSClient<UseModel>, "useModel" | "send" | "start"> {
         const hostValue = utils.getValue(this.config.host, option.env || "PROD");
         const connectionString = `ws://${hostValue}:${this.config.port}`;
+        this.log.info("连接服务器：" + connectionString);
         this.startOption = option;
         this.socket = this.createSocket(connectionString);
         this.socket.addEventListener("open", this.onOpen.bind(this));
@@ -183,6 +184,9 @@ export class WSClient<UseModel={}> {
                 modelObj && typeof (modelObj as any).close === "function" && (modelObj as any).close();
             });
         }
+        if(this.config.loopRetry) {
+            this.tryConnect();
+        }
     }
     private onError(err: ErrorEvent): void {
         const code = (err as any).code || err.error?.code;
@@ -196,7 +200,7 @@ export class WSClient<UseModel={}> {
     }
     private tryConnect() {
         if(!this.isRetryConnect) {
-            if(this.retryCount > 30) {
+            if(!this.config.loopRetry && this.retryCount > 30) {
                 this.log.error("多次尝试重新连接失败。[CT_RETRY_TIMEOUT]");
                 return;
             }
