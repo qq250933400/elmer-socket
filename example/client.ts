@@ -9,10 +9,16 @@ interface IChat {
 }
 
 class ClientModel extends AModel<IChat> {
+    public onMessage(event: MessageEvent<any>): void {
+        console.log(event);
+    }
 
 }
 
 class UserModel extends AModel<IChat> {
+    public onMessage(event: MessageEvent<any>): void {
+        console.log(event);
+    }
     test(): void {
         console.log("do some test");
         this.on("onMessage", (event) => {

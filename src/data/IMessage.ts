@@ -12,6 +12,11 @@ export interface IMsgData<T={}, MsgType = keyof (IMsgDataEx & T)> {
     toUsers: string[];
     fromUser?: string;
     data: TypeUseData<T & IMsgDataEx, keyof (IMsgDataEx & T)>;
+    waitReply?: boolean;
+    /** 不需要传此参数，服务器返回 */
+    msgId?: string;
+    /** 错误场景，错误信息传此参数 */
+    exception?: any;
 }
 
 export interface IMsgEvent {

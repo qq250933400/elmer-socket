@@ -16,6 +16,7 @@ export class MessageHandler {
     public getClients!: () => IClientInstanceInfo[];
     public sendToEx!: (toUsers: string[], msgData: IMsgData) => any;
     public sendToAllEx!: (msgData: IMsgData) => any;
+
     constructor(
         private log: Log,
         private com: CommonUtils

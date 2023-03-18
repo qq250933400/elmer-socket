@@ -5,19 +5,22 @@ import { CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA } from "../data/co
 import { ILogConfig } from "../config/ILogConfig";
 import { checkDir } from "../utils/file";
 import LogConfigSchema from "../config/LogConfig.schema";
-// import * as fs from "fs";
+import { BaseLog } from "./BaseLog";
 
 export type TypeLogType = "ERROR" | "INFO" | "DEBUG" | "WARN" | "SUCCESS";
 
 @AppService
-export class Log {
+export class Log extends BaseLog {
     @GetConfig(CONST_LOG_CONFIG_FILENAME, CONST_LOG_CONFIG_INITDATA, LogConfigSchema)
-    private config: ILogConfig;
+    private nodeConfig: ILogConfig;
     private mode: "node"|"web" = "web";
     private savePath: string;
     constructor(
-        private com: CommonUtils
-    ) {}
+        comx: CommonUtils
+    ) {
+        super(comx);
+        this.config = this.nodeConfig;
+    }
     init() {
         this.mode = this.config?.mode || "web";
         if(this.mode === "node") {
@@ -27,39 +30,10 @@ export class Log {
             checkDir(logPath, process.cwd());
         }
     }
-    log(msg: any, type: TypeLogType = "INFO"): void {
-        const now = new Date();
-        const dateStr = [this.com.formatLen(now.getFullYear(), 4), this.com.formatLen(now.getMonth(), 2), this.com.formatLen(now.getDate(),2)].join("-");
-        const timeStr = [this.com.formatLen(now.getHours(), 2), this.com.formatLen(now.getMinutes(), 2), this.com.formatLen(now.getSeconds(),2)].join(":");
-        const dateTimeStr = dateStr + " " + timeStr;
-        let saveMessage = `[${type}][${dateTimeStr}] ${msg}`;
-        if(type === "INFO") {
-            console.info(saveMessage);
-        } else if(type === "ERROR") {
-            console.error(saveMessage);
-        } else if(type === "WARN") {
-            this.config?.level === "DEBUG" && console.warn(saveMessage);
-        } else if(type === "SUCCESS") {
-            console.log(saveMessage);
-        } else {
-            console.log(saveMessage);
-        }
+    log(msg: any, type: TypeLogType = "INFO"): string {
+        const saveMessage = super.log(msg, type);
         this.saveToFile(type, saveMessage);
-    }
-    info(msg: any): void {
-        this.log(msg, "INFO");
-    }
-    warn(msg: any): void {
-        this.log(msg, "WARN");
-    }
-    error(msg: any): void {
-        this.log(msg, "ERROR");
-    }
-    debug(msg: any): void {
-        this.log(msg, "DEBUG");
-    }
-    success(msg: any): void {
-        this.log(msg, "SUCCESS");
+        return saveMessage;
     }
     private saveToFile(type: TypeLogType,msg: string): void {
         const shouldSaveToFile = type !== "DEBUG" || (this.config?.level === "DEBUG" && type === "DEBUG");

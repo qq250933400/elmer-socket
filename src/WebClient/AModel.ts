@@ -1,23 +1,23 @@
 import "reflect-metadata";
 import { Observe } from "elmer-common";
 import { IMsgData, IMsgEvent } from "../data/IMessage";
-import { CONST_CLIENT_CONFIG_FILENAME, CONST_CLIENT_CONFIG_INITDATA } from "../data/const";
-import { GetConfig } from "../common/decorators";
 import { IClientConfig } from "../config/IClientConfig";
 
-interface ISocketOption {
-    send(data: any):Promise<any>;
+interface ISocketOption<IMsg = {},UseModel={}> {
+    send(data: IMsgData<IMsg>):Promise<any>;
+    invoke: <ModelName extends keyof UseModel>(model: ModelName, method: keyof UseModel[ModelName], ...args: any[]) => Promise<any>;
 }
 
-export abstract class AModel<TypeMsg={}> {
-    @GetConfig(CONST_CLIENT_CONFIG_FILENAME, CONST_CLIENT_CONFIG_INITDATA)
+export abstract class AModel<TypeMsg={}, UseModel={}> {
+
     public config: IClientConfig;
 
     public static modelId: string;
+    public option!: ISocketOption<UseModel>;
+
     private event: Observe<IMsgEvent>;
-    private option: ISocketOption;
-    constructor(option: ISocketOption) {
-        this.option = option;
+    
+    constructor() {
         this.event = new Observe<IMsgEvent>();
         this.event.on("onClose", () => {
             this.event.unBind("onMessage");
@@ -33,7 +33,10 @@ export abstract class AModel<TypeMsg={}> {
         }
     }
     public send<Name extends keyof (TypeMsg & TypeMsg)>(data: Omit<IMsgData<(TypeMsg & TypeMsg)[Name]>, "fromUser">): Promise<any> {
-        return this.option.send(data);
+        return this.option.send(data as any);
+    }
+    public invoke<ModelName extends keyof UseModel>(model: ModelName, method: keyof UseModel[ModelName], ...args: any[]): Promise<any> {
+        return (this.option.invoke as any)(model, method, ...args);
     }
     protected close(): void {
         this.event.emit("onClose");
