@@ -44,7 +44,7 @@ export class Client {
                             this.socket.close();
                             this.onClose.bind(this);
                         }
-                    });
+                    } as any);
                 }
             } else {
                 console.log(event.data, "==========");

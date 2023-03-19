@@ -7,8 +7,9 @@ import { IClientConfig, TypeENV } from "../config/IClientConfig";
 import { BaseLog } from "../common/BaseLog";
 import { EnumSocketErrorCode } from "../data/statusCode";
 import { AModel } from "./AModel";
-import { IMsgData } from "../data/IMessage";
+import { IMsgData, IMsgDataEx } from "../data/IMessage";
 import { CommonUtils } from "../utils/CommonUtils";
+
 
 interface IWSClientStartOption {
     env: TypeENV,
@@ -79,32 +80,51 @@ export class WebClient<IMsg={}, UseModel={}> {
     send<TypeMsgData={}>(data: IMsgData<TypeMsgData>): Promise<any> {
         return new Promise((resolve, reject)=>{
             const msgId = "msg_" + utils.guid();
-            if(data.type === "binary" || data.type === "blob") {
-                const packData = this.com.encodeMsgPackage(data, null, false);
-                this.socket.send({
-                    ...packData,
-                    msgId
-                });
-            } else {
-                this.socket.send(JSON.stringify({
-                    ...data,
-                    msgId
-                }));
-            }
-            if(!data.waitReply) {
-                resolve({});
-            } else {
-                this.msgHandler[msgId] = {
-                    resolve,
-                    reject
-                };
+            try{
+                if(this.socket.readyState === 1) {
+                    if(data.type === "binary" || data.type === "blob") {
+                        const packData = this.com.encodeMsgPackage(data, null, false);
+                        this.socket.send({
+                            ...packData,
+                            msgId
+                        });
+                    } else {
+                        this.socket.send(JSON.stringify({
+                            ...data,
+                            msgId
+                        }));
+                    }
+                    if(!data.waitReply) {
+                        resolve({});
+                    } else {
+                        this.msgHandler[msgId] = {
+                            resolve,
+                            reject
+                        };
+                    }
+                } else {
+                    reject({
+                        code: "Closed",
+                        message: "未连接到服务端",
+                        status: this.socket.readyState,
+                        data
+                    });
+                }
+            }catch(e) {
+                console.error(data);
+                reject(e);
             }
         });
     }
-    sendEx<MsgType extends keyof IMsg>(msgType: MsgType, data: IMsgData<IMsg[MsgType]>): Promise<any> {
+    sendEx<MsgType extends (keyof IMsg | keyof IMsgDataEx)>(
+        msgType: MsgType,
+        data: {
+            data: IMsg[Exclude<MsgType, keyof IMsgDataEx>] | IMsgDataEx[Exclude<MsgType, keyof IMsg>]
+        } & Partial<Pick<IMsgData, "exception"|"toUsers"|"waitReply">>
+    ): Promise<any> {
         return this.send({
-            type: msgType,
-            ...data
+            type: msgType as any,
+            ...(data as any)
         });
     }
     ready(fn: Function): WebClient<IMsg,UseModel> {
@@ -112,7 +132,10 @@ export class WebClient<IMsg={}, UseModel={}> {
         return this;
     }
     dispose(): void {
-        this.socket.close(1, "Client was closed by user.");
+        if(this.socket) {
+            this.socket.close(1000);
+            this.socket = null;
+        }
     }
     invoke<NM extends keyof UseModel, T={}>(model: NM, fnName: keyof UseModel[NM], ...args: any[]): T|null|undefined {
         let modelObj: any;
@@ -139,7 +162,12 @@ export class WebClient<IMsg={}, UseModel={}> {
         modelObj.option = {
             send: this.send.bind(this)
         };
-        modelObj.config = this.config;
+        Object.defineProperty(modelObj, "config", {
+            get: () => this.config
+        });
+        Object.defineProperty(modelObj, "log", {
+            get: () => this.log
+        });
     }
     private createSocket(connection: string): WebSocket {
         try {
@@ -184,14 +212,36 @@ export class WebClient<IMsg={}, UseModel={}> {
                     } else {
                         msgHandle.resolve(msgData)
                     }
+                    delete this.msgHandler[msgData.msgId]; // remove the reponse handle
                 } else {
                     (obj as any).message({
                         ...event,
                         data: msgData
                     });
                 }
+            } else if(/_Response$/.test(msgData.type)) {
+                const msgHandle = this.msgHandler[msgData.msgId];
+                if(msgHandle) {
+                    if(msgData.exception) {
+                        msgHandle.reject(msgData.exception, msgData);
+                    } else {
+                        msgHandle.resolve(msgData)
+                    }
+                    delete this.msgHandler[msgData.msgId];
+                }
             }
         });
+        if(/_Response$/.test(msgData.type) && this.msgHandler[msgData.msgId]) {
+            const msgHandle = this.msgHandler[msgData.msgId];
+            if(msgHandle) {
+                if(msgData.exception) {
+                    msgHandle.reject(msgData.exception, msgData);
+                } else {
+                    msgHandle.resolve(msgData)
+                }
+                delete this.msgHandler[msgData.msgId];
+            }
+        }
     }
     private onClose(event: CloseEvent): void {
         const code = event.code;
@@ -234,6 +284,7 @@ export class WebClient<IMsg={}, UseModel={}> {
                 this.isRetryConnect = true;
                 const time = setTimeout(() => {
                     this.retryCount += 1;
+                    this.dispose();
                     this.start(this.startOption);
                     clearTimeout(time);
                 }, 2000);

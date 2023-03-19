@@ -108,31 +108,51 @@ export class Application<UseModel={}> {
         }
         return undefined;
     }
-    public sendToAll<T={}>(msgData: {[ P in Exclude<keyof IMsgData<T>, "toUsers"|"fromUser">]: IMsgData<T>[P]}): void {
+    public sendToAll<T={}>(msgData: {[ P in Exclude<keyof IMsgData<T>, "toUsers"|"fromUser">]?: IMsgData<T>[P]}): void {
         this.clients.forEach((info: IClientInstanceInfo) => {
-            const requestId = info.clientId;
-            const clientId = info.classId;
-            const requestObjs: any = this.clientPool[requestId];
-            const clientObj: Client = requestObjs[clientId];
-            clientObj.send({
-                ...msgData,
-                fromUser: "ApplicationServer"
-            } as any);
+            const clientId = info.clientId;
+            const requestId = info.classId;
+            const requestObjs: any = this.clientPool[clientId] || {};
+            const clientObj: Client = requestObjs[requestId];
+            if(clientObj) {
+                const msgId: string = msgData.msgId || "msg_" + utils.guid();
+                clientObj.send({
+                    ...msgData,
+                    fromUser: "ApplicationServer",
+                    msgId
+                } as any);
+            } else {
+                console.log(requestObjs);
+            }
         });
     }
     public sendTo<T={}>(toUsers: string[], msgData: {[ P in Exclude<keyof IMsgData<T>, "toUsers">]: IMsgData<T>[P]}): void {
         this.clients.forEach((info: IClientInstanceInfo) => {
-            const requestId = info.clientId;
-            const clientId = info.classId;
+            const clientId = info.clientId;
+            const requestId = info.classId;
             if(toUsers.includes(clientId)) {
-                const requestObjs: any = this.clientPool[requestId];
-                const clientObj: Client = requestObjs[clientId];
+                const requestObjs: any = this.clientPool[clientId];
+                const clientObj: Client = requestObjs[requestId];
+                const msgId: string = msgData.msgId || "msg_" + utils.guid();
                 clientObj.send({
                     ...msgData,
-                    fromUser: "ApplicationServer"
+                    fromUser: "ApplicationServer",
+                    msgId
                 } as any);
             }
         });
+    }
+    public sendToEx(toUser: string, data: any): Promise<any> {
+        for(const info of this.clients) {
+            const clientId = info.clientId;
+            const requestId = info.classId;
+            if(toUser === clientId ) {
+                const requestObjs: any = this.clientPool[clientId];
+                const clientObj: Client = requestObjs[requestId];
+                return this.msgHandler.sendToExAsync(clientObj, data);
+            }
+        }
+        return Promise.reject({ message: "Lost connection"});
     }
     private getModelInstance(modelFactory: new(...args:any[])=>any): void {
         const modelObj = getObjFromInstance(modelFactory, this);
@@ -148,6 +168,10 @@ export class Application<UseModel={}> {
             sendToAll: this.sendToAll.bind(this),
             sendTo: this.sendTo.bind(this)
         };
+        modelObj.invoke = this.invoke.bind(this);
+        modelObj.sendToEx = this.sendToEx.bind(this);
+        modelObj.sendTo = this.sendTo.bind(this);
+        modelObj.log = this.log;
     }
     private onClose(): void {
         // release all client
@@ -219,6 +243,12 @@ export class Application<UseModel={}> {
         const requestId = client.uid;
         const requestPools = this.clientPool[requestId];
         const clientId = Reflect.getMetadata(CONST_DECORATOR_FOR_MODULE_CLASSID, client.constructor);
+        if(this.modelPools) {
+            Object.keys(this.modelPools).forEach((mid: string) => {
+                const modelObj = this.modelPools[mid];
+                typeof modelObj.onClientClose === "function" && modelObj.onClientClose(client.uid);
+            })
+        }
         if(requestPools) {
             Object.keys(requestPools).forEach((classId: string) => {
                 const obj = requestPools[classId];

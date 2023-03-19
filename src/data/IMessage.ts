@@ -1,10 +1,9 @@
-interface IMsgDataEx {
+export interface IMsgDataEx {
     text: string,
     binary: ArrayBuffer,
     blob: Blob;
     Beat: string;
 }
-
 type TypeUseData<T, NType extends keyof T> = T[NType];
 
 export interface IMsgData<T={}, MsgType = keyof (IMsgDataEx & T)> {
@@ -29,4 +28,5 @@ export interface IServerClientData {
     ip: string;
     uid: string;
     close: Function;
+    reply: (data: { data?: any, exception?: any }) => void;
 }

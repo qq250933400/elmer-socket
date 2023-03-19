@@ -13,7 +13,7 @@ import { WebClient } from "./WebClient";
 import WebSocket from "ws";
 
 @AppService
-export class WSClient<UseModel={}> extends WebClient<UseModel> {
+export class WSClient<IMsg={}, UseModel={}> extends WebClient<IMsg,UseModel> {
     /** 是否已连接到服务器 */
     public isConnected: boolean = false;
 
@@ -26,6 +26,10 @@ export class WSClient<UseModel={}> extends WebClient<UseModel> {
         comX: CommonUtils
     ) {
         super(logX, comX, WebSocket as any);
-        this.config = this.configForNode;
+        Object.defineProperty(this, "config", {
+            get: () => {
+                return this.configForNode;
+            }
+        });
     }
 }

@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { Observe } from "elmer-common";
 import { IMsgData, IMsgEvent } from "../data/IMessage";
 import { IClientConfig } from "../config/IClientConfig";
+import { BaseLog } from "../common/BaseLog";
 
 interface ISocketOption<IMsg = {},UseModel={}> {
     send(data: IMsgData<IMsg>):Promise<any>;
@@ -11,6 +12,7 @@ interface ISocketOption<IMsg = {},UseModel={}> {
 export abstract class AModel<TypeMsg={}, UseModel={}> {
 
     public config: IClientConfig;
+    public log!: BaseLog;
 
     public static modelId: string;
     public option!: ISocketOption<UseModel>;
