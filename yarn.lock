@@ -697,10 +697,10 @@
   "resolved" "https://registry.npmjs.org/electron-to-chromium/-/electron-to-chromium-1.4.284.tgz"
   "version" "1.4.284"
 
-"elmer-common@^3.2.1":
-  "integrity" "sha512-AmrE8UyUk0M7Cz+2/UvU/WYMUZ/Tu45UvLOp19q2pN2+JI8DNjFgwr/1sr9sKq3J8TNZ6egC/jso1ZrDL6NReQ=="
-  "resolved" "https://registry.npmjs.org/elmer-common/-/elmer-common-3.2.1.tgz"
-  "version" "3.2.1"
+"elmer-common@^3.2.2":
+  "integrity" "sha512-avhCpssUJgAx/DS1x6j51PzYeqn89t92rvkURiQy2QN1vRn0GThQyMrf6hVqkDny2pxWejjYdWNQGHkaGjIJQA=="
+  "resolved" "https://registry.npmjs.org/elmer-common/-/elmer-common-3.2.2.tgz"
+  "version" "3.2.2"
   dependencies:
     "@types/core-js" "^2.5.0"
     "ajv" "5.0.0"

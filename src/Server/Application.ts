@@ -159,7 +159,7 @@ export class Application<UseModel={}> {
         const uid = (modelFactory as any).modelId;
         if(!this.modelPools[uid]) {
             this.mountModel(modelObj);
-            this.modelPools[uid] = uid;
+            this.modelPools[uid] = modelObj;
         }
         return modelObj;
     }

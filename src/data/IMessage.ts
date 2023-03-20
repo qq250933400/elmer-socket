@@ -18,9 +18,10 @@ export interface IMsgData<T={}, MsgType = keyof (IMsgDataEx & T)> {
     exception?: any;
 }
 
-export interface IMsgEvent {
-    onMessage(event: MessageEvent): void;
+export interface IMsgEvent<IMsg={}> {
+    onMessage<MsgType extends keyof IMsg>(data: { type: MsgType, data: TypeUseData<IMsg, MsgType> },event: MessageEvent): void;
     onClose(event: CloseEvent): void;
+    onReady(Fn: Function): void;
 }
 
 export interface IServerClientData {

@@ -7,7 +7,7 @@ import { IClientConfig, TypeENV } from "../config/IClientConfig";
 import { BaseLog } from "../common/BaseLog";
 import { EnumSocketErrorCode } from "../data/statusCode";
 import { AModel } from "./AModel";
-import { IMsgData, IMsgDataEx } from "../data/IMessage";
+import { IMsgData, IMsgDataEx, IMsgEvent } from "../data/IMessage";
 import { CommonUtils } from "../utils/CommonUtils";
 
 
@@ -36,18 +36,18 @@ export class WebClient<IMsg={}, UseModel={}> {
     private isUseModelCalled?: boolean = false;
     private msgHandler: any = {};
     // event handler
-    private event: Observe<any>;
+    private event: Observe<IMsgEvent>;
     constructor(
         private log: BaseLog,
         private com: CommonUtils,
         private SocketClient: typeof WebSocket
     ) {
         this.models = [];
-        this.event = new Observe<any>();
+        this.event = new Observe<IMsgEvent>();
     }
     start(option: IWSClientStartOption): Exclude<WebClient<IMsg,UseModel>, "useModel" | "send" | "start"> {
-        const hostValue = utils.getValue(this.config.host, option.env || "PROD");
-        const connectionString = `ws://${hostValue}:${this.config.port}`;
+        const hostValue = utils.getValue(this.config.host, option.env || "PROD") as string;
+        const connectionString = !/\:[\d]{1,}$/.test(hostValue) ? `ws://${hostValue}:${this.config.port}` : hostValue;
         this.log.info("连接服务器：" + connectionString);
         this.startOption = option;
         this.socket = this.createSocket(connectionString);
@@ -128,7 +128,7 @@ export class WebClient<IMsg={}, UseModel={}> {
         });
     }
     ready(fn: Function): WebClient<IMsg,UseModel> {
-        this.event.on("onReady", fn);
+        this.event.on("onReady", fn as any);
         return this;
     }
     dispose(): void {
@@ -158,6 +158,15 @@ export class WebClient<IMsg={}, UseModel={}> {
         }
         return undefined;
     }
+    /**
+     * 事件监听
+     * @param eventName 
+     * @param callback 
+     * @returns 
+     */
+    on<EventName extends keyof IMsgEvent>(eventName: EventName, callback: IMsgEvent<IMsg>[EventName]): Function {
+        return this.event.on(eventName, callback);
+    }
     private mountModel(modelObj: any): void {
         modelObj.option = {
             send: this.send.bind(this)
@@ -170,11 +179,12 @@ export class WebClient<IMsg={}, UseModel={}> {
         });
     }
     private createSocket(connection: string): WebSocket {
+        const connectStr = /^ws:\/\//.test(connection) ? connection : "ws://" + connection;
         try {
-            return new WebSocket(connection);
+            return new WebSocket(connectStr);
         } catch {
             const WSWebSocket = this.SocketClient as any;
-            return new WSWebSocket(connection) as any;
+            return new WSWebSocket(connectStr) as any;
         }
     }
     private beat(): void {
@@ -195,6 +205,7 @@ export class WebClient<IMsg={}, UseModel={}> {
     }
     private onMessage(event: MessageEvent): void {
         const msgData = this.decodeData(event.data);
+        let isResolveHandle = false;
         this.activeTime = Date.now();
         this.models.forEach((Model: AModel) => {
             const uid = (Model as any).modelId;
@@ -212,6 +223,7 @@ export class WebClient<IMsg={}, UseModel={}> {
                     } else {
                         msgHandle.resolve(msgData)
                     }
+                    isResolveHandle = true;
                     delete this.msgHandler[msgData.msgId]; // remove the reponse handle
                 } else {
                     (obj as any).message({
@@ -227,6 +239,7 @@ export class WebClient<IMsg={}, UseModel={}> {
                     } else {
                         msgHandle.resolve(msgData)
                     }
+                    isResolveHandle = true;
                     delete this.msgHandler[msgData.msgId];
                 }
             }
@@ -239,9 +252,11 @@ export class WebClient<IMsg={}, UseModel={}> {
                 } else {
                     msgHandle.resolve(msgData)
                 }
+                isResolveHandle = true;
                 delete this.msgHandler[msgData.msgId];
             }
         }
+        !isResolveHandle && this.event.emit("onMessage", msgData, event);
     }
     private onClose(event: CloseEvent): void {
         const code = event.code;
