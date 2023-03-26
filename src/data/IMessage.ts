@@ -1,3 +1,5 @@
+import { Cookies } from "../common/Cookies";
+
 export interface IMsgDataEx {
     text: string,
     binary: ArrayBuffer,
@@ -29,5 +31,6 @@ export interface IServerClientData {
     ip: string;
     uid: string;
     close: Function;
+    cookie: Cookies;
     reply: (data: { data?: any, exception?: any }) => void;
 }

@@ -71,7 +71,7 @@ export class MessageHandler {
                             this.sendToEx([clientId], {
                                 ...data,
                                 waitReply: false,
-                                fromUser: "ApplicationServer",
+                                fromUser:  msgData.fromUser || "ApplicationServer",
                                 type: msgData.type.toString() + "_Response",
                                 msgId: msgData.msgId
                             });

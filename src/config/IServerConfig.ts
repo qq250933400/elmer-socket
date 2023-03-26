@@ -7,5 +7,8 @@ export interface IServerConfig {
         level: TypeLogType,
         savePath: string,
         mode: "node"|"web"
+    },
+    security: {
+        AsePublicKey: string;
     }
 }

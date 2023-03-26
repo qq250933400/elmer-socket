@@ -2,6 +2,9 @@ import { RequestService, utils } from "elmer-common";
 import { MessageHandler } from "./MessageHandler";
 import { IMsgData } from "../data/IMessage";
 import { Log } from "../common/Log";
+import { Crypto } from "../common/Crypto";
+import { Cookies } from "../common/Cookies";
+import { IServerConfig } from "../config/IServerConfig";
 
 export interface IClientInstanceInfo {
     clientId: string;
@@ -15,8 +18,11 @@ export class Client {
     public socket!: WebSocket;
     public msgHandler!: MessageHandler;
     public ip!: string;
+    public config!: IServerConfig;
     constructor(
-        private log: Log
+        private log: Log,
+        private cookie: Cookies,
+        private crypto: Crypto
     ) {
         // this.option = reqOption;
     }
@@ -39,6 +45,7 @@ export class Client {
                         socket: this.socket,
                         ip: this.ip,
                         uid: this.uid,
+                        cookie: this.cookie,
                         close: (message: string) => {
                             message && this.log.info("客户端被断开：" + message);
                             this.socket.close();

@@ -1,7 +1,7 @@
 import { Common, queueCallFunc, Service } from "elmer-common";
 
-export type TypeMsgPackage = {
-    info: any;
+export interface IArrayBufferMsg<T={}> {
+    info: T;
     data: Buffer | ArrayBuffer | Blob;
 };
 
@@ -102,7 +102,7 @@ export class CommonUtils extends Common {
         lenBuffer.writeInt16BE(infoBuffer.length);
         return Buffer.concat([data, infoBuffer, lenBuffer, typeBuffer]);
     }
-    private decodePackageInBrowser(data: Blob, tag: string): Promise<any> {
+    private decodePackageInBrowser<T={}>(data: Blob, tag: string): Promise<T> {
         return new Promise<any>((resolve, reject) => {
             queueCallFunc([{
                 id: "tag",

@@ -15,7 +15,7 @@ export class BaseLog {
     }
     log(msg: any, type: TypeLogType = "INFO"): string {
         const now = new Date();
-        const dateStr = [this.com.formatLen(now.getFullYear(), 4), this.com.formatLen(now.getMonth(), 2), this.com.formatLen(now.getDate(),2)].join("-");
+        const dateStr = [this.com.formatLen(now.getFullYear(), 4), this.com.formatLen(now.getMonth() + 1, 2), this.com.formatLen(now.getDate(),2)].join("-");
         const timeStr = [this.com.formatLen(now.getHours(), 2), this.com.formatLen(now.getMinutes(), 2), this.com.formatLen(now.getSeconds(),2)].join(":");
         const dateTimeStr = dateStr + " " + timeStr;
         let saveMessage = `[${type}][${dateTimeStr}] ${msg}`;

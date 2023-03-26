@@ -16,7 +16,17 @@ export default {
             type: "Object",
             properties: {
                 level: {
-                    type: ["INFO","DEBUG","ERROR", "WARN", "SUCCESS"]
+                    type: ["INFO","DEBUG","ERROR", "WARN", "SUCCESS"],
+                    defaultValue: "INFO"
+                }
+            }
+        },
+        security: {
+            type: "Object",
+            properties: {
+                AsePublicKey: {
+                    type: "String",
+                    defaultValue: "a06ca88776f4ad0"
                 }
             }
         }

@@ -19,6 +19,7 @@ import { MessageHandler } from "./MessageHandler";
 import { IMsgData } from "../data/IMessage";
 import { Store } from "../data/Store";
 import { ApiService } from "../common/ApiService";
+import { IncomingMessage } from "http";
 
 
 @AppService
@@ -67,6 +68,7 @@ export class Application<UseModel={}> {
         this.socket.on("connection", this.onConnection.bind(this));
         this.socket.on("error", this.onError.bind(this));
         this.socket.on("close", this.onClose.bind(this));
+        this.socket.on("headers", this.onHeader.bind(this));
     }
     public ready(fn: Function) {
         this.onReadyEvent = fn;
@@ -206,7 +208,7 @@ export class Application<UseModel={}> {
         this.log.info(`Application running at: ws://${this.config.host}:${this.config.port}`);
         typeof this.onReadyEvent === "function" && this.onReadyEvent.call(this);
     }
-    private onConnection(client: WebSocket, req: any) {
+    private onConnection(client: WebSocket, req: IncomingMessage) {
         const requestClientId = "ws_sev_req_" + utils.guid();
         const requestClientIp = req.connection?.remoteAddress;
         const clientObj: Client = getObjFromInstance(Client, this, (Factory: new(...args:any[]) => any, opt) => {
@@ -263,5 +265,8 @@ export class Application<UseModel={}> {
             delete this.clientPool[requestId];
         }
         this.log.info("连接已断开:" + requestId);
+    }
+    private onHeader(headers: string[]) {
+
     }
 }
