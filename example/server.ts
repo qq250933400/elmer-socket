@@ -1,5 +1,5 @@
 import { createInstance } from "elmer-common";
-import { Application } from "../src/ServerClicnt";
+import { Application } from "../src/Server";
 import { SevController } from "./SevController";
 
 type TypeAppModel = {

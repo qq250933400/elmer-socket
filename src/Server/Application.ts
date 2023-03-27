@@ -68,7 +68,6 @@ export class Application<UseModel={}> {
         this.socket.on("connection", this.onConnection.bind(this));
         this.socket.on("error", this.onError.bind(this));
         this.socket.on("close", this.onClose.bind(this));
-        this.socket.on("headers", this.onHeader.bind(this));
     }
     public ready(fn: Function) {
         this.onReadyEvent = fn;
@@ -225,6 +224,7 @@ export class Application<UseModel={}> {
                 obj = new Factory(...opt.args);
                 obj.socket = client;
                 requestPool[classId] = obj;
+                console.log("RequestService:", Factory.name);
             }
             return obj;
         });
@@ -237,6 +237,7 @@ export class Application<UseModel={}> {
         clientObj.dispose = this.releaseClient.bind(this);
         clientObj.msgHandler = this.msgHandler;
         clientObj.ip = requestClientIp;
+        clientObj.config = this.config;
         clientObj.listen();
         this.log.info("客户端接入：" + requestClientId);
         return clientObj;
@@ -266,7 +267,5 @@ export class Application<UseModel={}> {
         }
         this.log.info("连接已断开:" + requestId);
     }
-    private onHeader(headers: string[]) {
-
-    }
+   
 }

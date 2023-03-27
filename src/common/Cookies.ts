@@ -1,21 +1,13 @@
-import { AppService, utils } from "elmer-common";
+import { RequestService, utils } from "elmer-common";
 
 
-@AppService
+@RequestService
 export class Cookies {
     public readonly cookies: any = {};
+    private updateTime: number;
     public set(name: string, value: any): void {
-        if(this.cookies[name]) {
-            delete this.cookies[name];
-        }
-        Object.defineProperty(this.cookies, name, {
-            configurable: false,
-            enumerable: true,
-            get: ((val: any) => () => val)(value),
-            set: () => {
-                throw new Error("Cookies are read-only properties and setting by setter is not allowed");
-            }
-        });
+        this.updateTime = Date.now();
+        this.cookies[name] = value;
     }
     public get<T={}>(name: string): T|null {
         const val = this.cookies[name];
@@ -33,6 +25,8 @@ export class Cookies {
                 str.push(`${name}=${encodeURIComponent(JSON.stringify(val))}`);
             }
         });
+        this.updateTime = Date.now();
+        str.push(`timestamp=${this.updateTime}`);
         return str.join("&");
     }
 }

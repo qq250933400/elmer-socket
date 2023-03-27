@@ -10,3 +10,5 @@ declare interface ISchemaConfig<T={}, FormatCallback={}> {
 }
 declare var fs: NodeFs;
 declare var path: NodePath;
+
+declare var sessionStorage: Storage;

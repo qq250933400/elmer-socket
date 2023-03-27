@@ -10,19 +10,37 @@ interface IChat {
 
 class ClientModel extends AModel<IChat> {
     public onMessage(event: MessageEvent<any>): void {
-        console.log(event);
+        console.log(event.data, "-----ClientModel");
     }
 
 }
 
 class UserModel extends AModel<IChat> {
     public onMessage(event: MessageEvent<any>): void {
-        console.log(event);
+        console.log(event.data, "----UserModel");
+        if((event.data as any).type === "proxy") {
+            this.send({
+                type: "userName",
+                data: {
+                    name: "test"
+                }
+            } as any);
+            console.log("---ToServer--");
+        }
     }
     test(): void {
         console.log("do some test");
         this.on("onMessage", (event) => {
             console.log(event.data);
+            if((event.data as any).type === "proxy") {
+                this.send({
+                    type: "userName",
+                    data: {
+                        name: "test"
+                    }
+                } as any);
+                console.log("---ToServer--");
+            }
         })
     }
 }
@@ -33,7 +51,7 @@ type TypeUseModel = {
 }
 
 
-const app = (createInstance(WSClient<TypeUseModel>));
+const app = (createInstance(WSClient<{},TypeUseModel>));
 app.model({
     client: ClientModel,
     user: UserModel

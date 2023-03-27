@@ -13,6 +13,7 @@ export abstract class AModel<TypeMsg={}, UseModel={}> {
 
     public config: IClientConfig;
     public log!: BaseLog;
+    public readonly cookies!: string;
 
     public static modelId: string;
     public option!: ISocketOption<UseModel>;

@@ -37,6 +37,7 @@ export class WebClient<IMsg={}, UseModel={}> {
     private msgHandler: any = {};
     // event handler
     private event: Observe<IMsgEvent>;
+    private cookies!: string
     constructor(
         private log: BaseLog,
         private com: CommonUtils,
@@ -44,6 +45,9 @@ export class WebClient<IMsg={}, UseModel={}> {
     ) {
         this.models = [];
         this.event = new Observe<IMsgEvent>();
+        if(!this.com.isNode()) {
+            this.cookies = sessionStorage.getItem("websocket_cookie");
+        }
     }
     start(option: IWSClientStartOption): Exclude<WebClient<IMsg,UseModel>, "useModel" | "send" | "start"> {
         const hostValue = utils.getValue(this.config.host, option.env || "PROD") as string;
@@ -86,12 +90,14 @@ export class WebClient<IMsg={}, UseModel={}> {
                         const packData = this.com.encodeMsgPackage(data, null, false);
                         this.socket.send({
                             ...packData,
-                            msgId
+                            msgId,
+                            cookie: this.cookies
                         });
                     } else {
                         this.socket.send(JSON.stringify({
                             ...data,
-                            msgId
+                            msgId,
+                            cookie: this.cookies
                         }));
                     }
                     if(!data.waitReply) {
@@ -177,6 +183,9 @@ export class WebClient<IMsg={}, UseModel={}> {
         Object.defineProperty(modelObj, "log", {
             get: () => this.log
         });
+        Object.defineProperty(modelObj, "cookies", {
+            get: () => this.cookies
+        })
     }
     private createSocket(connection: string): WebSocket {
         const connectStr = /^ws:\/\//.test(connection) ? connection : "ws://" + connection;
@@ -207,6 +216,12 @@ export class WebClient<IMsg={}, UseModel={}> {
         const msgData = this.decodeData(event.data);
         let isResolveHandle = false;
         this.activeTime = Date.now();
+        if(this.cookies !== msgData.cookie && !utils.isEmpty(msgData.cookie)) {
+            this.cookies = msgData.cookie;
+            if(!this.com.isNode()) {
+                sessionStorage.setItem("websocket_cookie", this.cookies);
+            }
+        }
         this.models.forEach((Model: AModel) => {
             const uid = (Model as any).modelId;
             const useMessages: string[] = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Model) || [];

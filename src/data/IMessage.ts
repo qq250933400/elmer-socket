@@ -18,6 +18,7 @@ export interface IMsgData<T={}, MsgType = keyof (IMsgDataEx & T)> {
     msgId?: string;
     /** 错误场景，错误信息传此参数 */
     exception?: any;
+    cookie?: string;
 }
 
 export interface IMsgEvent<IMsg={}> {
@@ -33,4 +34,6 @@ export interface IServerClientData {
     close: Function;
     cookie: Cookies;
     reply: (data: { data?: any, exception?: any }) => void;
+    aesEncode: (text: string) => string;
+    aesDecode: (encodedString: string) => string;
 }

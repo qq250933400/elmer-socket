@@ -1,3 +1,4 @@
+// import ConfigSchema from "../config/ServerConfig.schema";
 import { AppService } from "elmer-common";
 import { Server as WebSocketServer } from "ws";
 import { Client, IClientInstanceInfo } from "./Client";
@@ -5,12 +6,20 @@ import { IMsgData, IServerClientData } from "../data/IMessage";
 import { Log } from "../common/Log";
 import { CommonUtils } from "../utils/CommonUtils";
 import { ASevModel } from "./ASevModel";
-import { CONST_MESSAGE_USE_FILTERKEYS } from "../data/const";
+import { CONST_MESSAGE_USE_FILTERKEYS,
+    // CONST_SERVER_CONFIG_FILENAME,
+    // CONST_SERVER_CONFIG_INITDATA
+} from "../data/const";
 import { utils } from "elmer-common";
 
+// import { GetConfig } from "../common/decorators";
+// import { IServerConfig } from "../config/IServerConfig";
 
 @AppService
 export class MessageHandler {
+    // @GetConfig<IServerConfig>(CONST_SERVER_CONFIG_FILENAME, CONST_SERVER_CONFIG_INITDATA, ConfigSchema)
+    // ​private​ config: IServerConfig;
+
     public socketServer!: WebSocketServer;
     public getModel!: <T={}>(Factory: new(...args:[]) => {}) => T;
     public getAllModel!: () => ASevModel[];
@@ -22,7 +31,7 @@ export class MessageHandler {
 
     constructor(
         private log: Log,
-        private com: CommonUtils
+        private com: CommonUtils,
     ) {
         this.log.init();
     }
@@ -30,7 +39,8 @@ export class MessageHandler {
         if(["binary","blob", "file"].includes(data.type as string)) {
             const sendData = this.com.encodeMsgPackage<any>(data.data, {
                 type: data.type,
-                fromUser: data.fromUser
+                fromUser: data.fromUser,
+                cookie: data.cookie
             }, this.com.isNode());
             client.socket.send(sendData);
         } else {

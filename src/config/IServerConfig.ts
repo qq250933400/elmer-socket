@@ -10,5 +10,6 @@ export interface IServerConfig {
     },
     security: {
         AsePublicKey: string;
+        salt?: string;
     }
 }
