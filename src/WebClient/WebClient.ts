@@ -60,6 +60,9 @@ export class WebClient<IMsg={}, UseModel={}> {
                 console.error("No event to handle the download file data.", event);
             }
         });
+        this.file.on("onProgress", (event) => {
+            this.event.emit("onFileTransferProgress", event);
+        });
     }
     start(option: IWSClientStartOption): Exclude<WebClient<IMsg,UseModel>, "useModel" | "send" | "start"> {
         const hostValue = utils.getValue(this.config.host, option.env || "PROD") as string;

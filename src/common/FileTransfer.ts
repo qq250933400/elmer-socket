@@ -73,9 +73,12 @@ interface IFileTransferInfo {
     fileId: string;
     msgId: string;
 }
+export interface IFileTransferProgressEvent extends IFileTransferInfo {
+    percent: string;
+}
 interface IFileTransferEvent {
     onStart: (event: IFileTransferInfo) => void;
-    onProgress: (event: IFileTransferInfo & { percent: string }) => void;
+    onProgress: (event: IFileTransferProgressEvent) => void;
     onComplete: (event: IFileTransferInfo & { data: Blob|ArrayBuffer } ) => void;
 }
 
@@ -156,6 +159,11 @@ export class FileTransfer {
                     }
                     tmepData.index = chunkIndex + 1;
                     this.log.debug("接收数据进度：" + msgData.percent);
+                    this.event.emit("onProgress", {
+                        fileId: msgId,
+                        msgId: tmepData.eventMsgId,
+                        percent: msgData.percent
+                    });
                     // 接收到数据，发起下一个chunk请求
                     api.socket.send(JSON.stringify({
                         msgId: msgId,

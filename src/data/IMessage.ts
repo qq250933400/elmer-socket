@@ -1,3 +1,4 @@
+import { IFileTransferProgressEvent } from "../common/FileTransfer";
 import { Cookies } from "../common/Cookies";
 
 export interface IMsgDataEx {
@@ -26,6 +27,7 @@ export interface IMsgEvent<IMsg={}> {
     onMessage<MsgType extends keyof IMsg>(data: { type: MsgType, data: TypeUseData<IMsg, MsgType> },event: MessageEvent): void;
     onClose(event: CloseEvent): void;
     onReady(Fn: Function): void;
+    onFileTransferProgress(event: IFileTransferProgressEvent): void;
 }
 
 export interface IServerClientData {
