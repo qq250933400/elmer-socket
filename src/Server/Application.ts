@@ -20,6 +20,7 @@ import { IMsgData } from "../data/IMessage";
 import { Store } from "../data/Store";
 import { ApiService } from "../common/ApiService";
 import { IncomingMessage } from "http";
+import { Crypto } from "../common/Crypto"
 
 
 @AppService
@@ -45,7 +46,8 @@ export class Application<UseModel={}> {
         private log: Log,
         private msgHandler: MessageHandler,
         private store: Store,
-        private service: ApiService
+        private service: ApiService,
+        private crypto: Crypto
     ) {
         this.log.init();
         this.models = [];
@@ -54,6 +56,7 @@ export class Application<UseModel={}> {
         this.msgHandler.getClients = () => this.clients;
         this.msgHandler.sendToEx = this.sendTo.bind(this);
         this.msgHandler.sendToAllEx = this.sendToAll.bind(this);
+        this.msgHandler.getClientById = this.getClientById.bind(this);
         this.service.setConfig(this.apiConfig);
     }
     public storeInit<T={}>(initData:T): void {
@@ -119,7 +122,7 @@ export class Application<UseModel={}> {
                 const msgId: string = msgData.msgId || "msg_" + utils.guid();
                 clientObj.send({
                     ...msgData,
-                    fromUser: "ApplicationServer",
+                    fromUser: (msgData as any).fromUser || "ApplicationServer",
                     msgId
                 } as any);
             } else {
@@ -137,7 +140,7 @@ export class Application<UseModel={}> {
                 const msgId: string = msgData.msgId || "msg_" + utils.guid();
                 clientObj.send({
                     ...msgData,
-                    fromUser: "ApplicationServer",
+                    fromUser: msgData.fromUser || "ApplicationServer",
                     msgId
                 } as any);
             }
@@ -154,6 +157,18 @@ export class Application<UseModel={}> {
             }
         }
         return Promise.reject({ message: "Lost connection"});
+    }
+    public getClientById(findClientId: string): Client|null {
+        for(const info of this.clients) {
+            const clientId = info.clientId;
+            const requestId = info.classId;
+            if(clientId === findClientId) {
+                const requestObjs: any = this.clientPool[clientId];
+                const clientObj: Client = requestObjs[requestId];
+                return clientObj;
+            }
+        }
+        return null;
     }
     private getModelInstance(modelFactory: new(...args:any[])=>any): void {
         const modelObj = getObjFromInstance(modelFactory, this);
@@ -208,64 +223,75 @@ export class Application<UseModel={}> {
         typeof this.onReadyEvent === "function" && this.onReadyEvent.call(this);
     }
     private onConnection(client: WebSocket, req: IncomingMessage) {
-        const requestClientId = "ws_sev_req_" + utils.guid();
-        const requestClientIp = req.connection?.remoteAddress;
-        const clientObj: Client = getObjFromInstance(Client, this, (Factory: new(...args:any[]) => any, opt) => {
-            const classId = opt.uid;
-            let requestPool = this.clientPool[requestClientId];
-            let obj = requestPool ? requestPool[classId] : null;
-            opt.shouldInit = true;
-            if(!this.clientPool[requestClientId]) {
-                requestPool = {};
-                this.clientPool[requestClientId] = requestPool;
-            }
-            if(!obj) {
-                Reflect.defineMetadata(CONST_SERVER_REQUEST_CLIENT_ID, requestClientId, Factory);
-                obj = new Factory(...opt.args);
-                obj.socket = client;
-                requestPool[classId] = obj;
-                console.log("RequestService:", Factory.name);
-            }
-            return obj;
-        });
-        const clientClassId = Reflect.getMetadata(CONST_DECORATOR_FOR_MODULE_CLASSID, Client);
-        this.clients.push({
-            clientId: requestClientId, // 用于查找Client
-            classId: clientClassId // 用于查找对应的Client instance
-        });
-        clientObj.uid = requestClientId;
-        clientObj.dispose = this.releaseClient.bind(this);
-        clientObj.msgHandler = this.msgHandler;
-        clientObj.ip = requestClientIp;
-        clientObj.config = this.config;
-        clientObj.listen();
-        this.log.info("客户端接入：" + requestClientId);
-        return clientObj;
+        try {
+            const requestClientId = "ws_sev_req_" + utils.guid();
+            const requestClientIp = req.connection?.remoteAddress;
+            const ssid = this.crypto.md5(requestClientId + Date.now.toString());
+            const clientObj: Client = getObjFromInstance(Client, this, (Factory: new(...args:any[]) => any, opt) => {
+                const classId = opt.uid;
+                let requestPool = this.clientPool[requestClientId];
+                let obj = requestPool ? requestPool[classId] : null;
+                opt.shouldInit = true;
+                if(!this.clientPool[requestClientId]) {
+                    requestPool = {};
+                    this.clientPool[requestClientId] = requestPool;
+                }
+                if(!obj) {
+                    Reflect.defineMetadata(CONST_SERVER_REQUEST_CLIENT_ID, requestClientId, Factory);
+                    obj = new Factory(...opt.args);
+                    obj.socket = client;
+                    requestPool[classId] = obj;
+                    console.log("RequestService:", Factory.name);
+                }
+                return obj;
+            });
+            const clientClassId = Reflect.getMetadata(CONST_DECORATOR_FOR_MODULE_CLASSID, Client);
+            this.clients.push({
+                clientId: requestClientId, // 用于查找Client
+                classId: clientClassId // 用于查找对应的Client instance
+            });
+            clientObj.uid = requestClientId;
+            clientObj.dispose = this.releaseClient.bind(this);
+            clientObj.msgHandler = this.msgHandler;
+            clientObj.ip = requestClientIp;
+            clientObj.config = this.config;
+            clientObj.listen();
+            clientObj.send({ type: "Session", data: ssid , })
+            this.log.info("客户端接入：" + requestClientId);
+            return clientObj;
+        } catch(e) {
+            this.log.error(e.stack || e.message);
+            throw e;
+        }
     }
     private releaseClient(client: Client) {
-        const requestId = client.uid;
-        const requestPools = this.clientPool[requestId];
-        const clientId = Reflect.getMetadata(CONST_DECORATOR_FOR_MODULE_CLASSID, client.constructor);
-        if(this.modelPools) {
-            Object.keys(this.modelPools).forEach((mid: string) => {
-                const modelObj = this.modelPools[mid];
-                typeof modelObj.onClientClose === "function" && modelObj.onClientClose(client.uid);
-            })
+        try{
+            const requestId = client.uid;
+            const requestPools = this.clientPool[requestId];
+            const clientId = Reflect.getMetadata(CONST_DECORATOR_FOR_MODULE_CLASSID, client.constructor);
+            if(this.modelPools) {
+                Object.keys(this.modelPools).forEach((mid: string) => {
+                    const modelObj = this.modelPools[mid];
+                    typeof modelObj.onClientClose === "function" && modelObj.onClientClose(client.uid);
+                })
+            }
+            if(requestPools) {
+                Object.keys(requestPools).forEach((classId: string) => {
+                    const obj = requestPools[classId];
+                    const objId = Reflect.getMetadata(CONST_DECORATOR_FOR_MODULE_CLASSID, obj.constructor);
+                    if(objId !== clientId) {
+                        typeof obj.dispose === "function" && obj.dispose();
+                        requestPools[classId] = null;
+                        delete requestPools[classId];
+                    }
+                });
+                requestPools[clientId] = null;
+                delete this.clientPool[requestId];
+            }
+            this.log.info("连接已断开:" + requestId);
+        } catch(e) {
+            this.log.error(e.stack || e.message);
         }
-        if(requestPools) {
-            Object.keys(requestPools).forEach((classId: string) => {
-                const obj = requestPools[classId];
-                const objId = Reflect.getMetadata(CONST_DECORATOR_FOR_MODULE_CLASSID, obj.constructor);
-                if(objId !== clientId) {
-                    typeof obj.dispose === "function" && obj.dispose();
-                    requestPools[classId] = null;
-                    delete requestPools[classId];
-                }
-            });
-            requestPools[clientId] = null;
-            delete this.clientPool[requestId];
-        }
-        this.log.info("连接已断开:" + requestId);
     }
    
 }

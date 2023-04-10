@@ -9,6 +9,7 @@ import { IClientConfig } from "../config/IClientConfig";
 import { GetConfig } from "../common/decorators";
 import { Log } from "../common/Log";
 import { CommonUtils } from "../utils/CommonUtils";
+import { FileTransfer } from "../common/FileTransfer";
 import { WebClient } from "./WebClient";
 import WebSocket from "ws";
 
@@ -23,9 +24,13 @@ export class WSClient<IMsg={}, UseModel={}> extends WebClient<IMsg,UseModel> {
      
     constructor(
         logX: Log,
-        comX: CommonUtils
+        comX: CommonUtils,
+        fileX: FileTransfer
     ) {
-        super(logX, comX, WebSocket as any);
+        super(logX, comX, WebSocket as any, fileX);
+        (fileX as any).log = logX;
+        this.isNode = true;
+        fileX.isNode = true;
         Object.defineProperty(this, "config", {
             get: () => {
                 return this.configForNode;

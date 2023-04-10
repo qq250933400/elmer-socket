@@ -5,6 +5,7 @@ export interface IMsgDataEx {
     binary: ArrayBuffer,
     blob: Blob;
     Beat: string;
+    Session: string;
 }
 type TypeUseData<T, NType extends keyof T> = T[NType];
 

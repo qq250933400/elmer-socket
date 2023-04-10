@@ -27,8 +27,8 @@ export class BaseLog {
             this.config?.level === "DEBUG" && console.warn(saveMessage);
         } else if(type === "SUCCESS") {
             console.log(saveMessage);
-        } else {
-            console.log(saveMessage);
+        } else if(type === "DEBUG"){
+            this.config?.level === "DEBUG" && console.log(saveMessage);
         }
         return saveMessage;
     }

@@ -9,6 +9,7 @@ import { EnumSocketErrorCode } from "../data/statusCode";
 import { AModel } from "./AModel";
 import { IMsgData, IMsgDataEx, IMsgEvent } from "../data/IMessage";
 import { CommonUtils } from "../utils/CommonUtils";
+import { FileTransfer, ISendFileOptions } from "../common/FileTransfer";
 
 
 interface IWSClientStartOption {
@@ -21,6 +22,7 @@ export class WebClient<IMsg={}, UseModel={}> {
     public isConnected: boolean = false;
 
     public config!: IClientConfig;
+    public isNode: boolean = false;
 
     private socket: WebSocket;
     private isRetryConnect: boolean = false;
@@ -38,16 +40,26 @@ export class WebClient<IMsg={}, UseModel={}> {
     // event handler
     private event: Observe<IMsgEvent>;
     private cookies!: string
+    private resolveHandler: any = {};
     constructor(
         private log: BaseLog,
         private com: CommonUtils,
-        private SocketClient: typeof WebSocket
+        private SocketClient: typeof WebSocket,
+        private file: FileTransfer
     ) {
         this.models = [];
         this.event = new Observe<IMsgEvent>();
         if(!this.com.isNode()) {
             this.cookies = sessionStorage.getItem("websocket_cookie");
         }
+        this.file.on("onComplete", (event) => {
+            if(this.msgHandler[event.msgId]) {
+                this.msgHandler[event.msgId].resolve(event);
+                delete this.msgHandler[event.msgId];
+            } else {
+                console.error("No event to handle the download file data.", event);
+            }
+        });
     }
     start(option: IWSClientStartOption): Exclude<WebClient<IMsg,UseModel>, "useModel" | "send" | "start"> {
         const hostValue = utils.getValue(this.config.host, option.env || "PROD") as string;
@@ -105,7 +117,8 @@ export class WebClient<IMsg={}, UseModel={}> {
                     } else {
                         this.msgHandler[msgId] = {
                             resolve,
-                            reject
+                            reject,
+                            msgType: data.type
                         };
                     }
                 } else {
@@ -139,6 +152,7 @@ export class WebClient<IMsg={}, UseModel={}> {
     }
     dispose(): void {
         if(this.socket) {
+            this.log.info(this.socket.readyState + "|Connecting: " + this.socket.CONNECTING);
             this.socket.close(1000);
             this.socket = null;
         }
@@ -173,6 +187,12 @@ export class WebClient<IMsg={}, UseModel={}> {
     on<EventName extends keyof IMsgEvent>(eventName: EventName, callback: IMsgEvent<IMsg>[EventName]): Function {
         return this.event.on(eventName, callback);
     }
+    sendFile(options: ISendFileOptions) {
+        return new Promise((resolve, reject) => {
+            const msgId = this.file.sendFile(options);
+            this.resolveHandler[msgId] = { resolve, reject };
+        });
+    }
     private mountModel(modelObj: any): void {
         modelObj.option = {
             send: this.send.bind(this)
@@ -185,7 +205,12 @@ export class WebClient<IMsg={}, UseModel={}> {
         });
         Object.defineProperty(modelObj, "cookies", {
             get: () => this.cookies
-        })
+        });
+        Object.defineProperties(modelObj, {
+            sendFile: {
+                get: () => this.sendFile.bind(this)
+            }
+        });
     }
     private createSocket(connection: string): WebSocket {
         const connectStr = /^ws:\/\//.test(connection) ? connection : "ws://" + connection;
@@ -214,64 +239,96 @@ export class WebClient<IMsg={}, UseModel={}> {
     }
     private onMessage(event: MessageEvent): void {
         const msgData = this.decodeData(event.data);
-        let isResolveHandle = false;
-        this.activeTime = Date.now();
-        if(this.cookies !== msgData.cookie && !utils.isEmpty(msgData.cookie)) {
-            this.cookies = msgData.cookie;
-            if(!this.com.isNode()) {
-                sessionStorage.setItem("websocket_cookie", this.cookies);
+        const api: any = {
+            fromUser: null,
+            socket: this.socket,
+            reply: (data: any) => {
+                this.socket.send(JSON.stringify({
+                    msgId: msgData.msgId,
+                    msgType: msgData.type + "_Response",
+                    data: data?.data,
+                    exception: data?.exception,
+                    toUsers: msgData.fromUser ? [msgData.fromUser] : null,
+                    waitReply: false
+                }));
+            }
+        };
+        if(msgData) {
+            let isResolveHandle = false;
+            api.fromUser = msgData.fromUser ? msgData.fromUser : null
+            this.activeTime = Date.now();
+            if(this.cookies !== msgData.cookie && !utils.isEmpty(msgData.cookie)) {
+                this.cookies = msgData.cookie;
+                if(!this.com.isNode()) {
+                    sessionStorage.setItem("websocket_cookie", this.cookies);
+                }
+            }
+            if(!this.file.onMessage(msgData, api)) {
+                // 不是发送文件消息，转到model去做处理
+                this.models.forEach((Model: AModel) => {
+                    const uid = (Model as any).modelId;
+                    const useMessages: string[] = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Model) || [];
+                    if(useMessages.includes(msgData.type) || useMessages.length <= 0) {
+                        const obj:AModel = getObjFromInstance(Model as any, this);
+                        const msgHandle = this.msgHandler[msgData.msgId];
+                        if(!this.modelPools[uid]) {
+                            this.mountModel(obj);
+                            this.modelPools[uid] = obj;
+                        }
+                        if(msgHandle) {
+                            if(msgData.exception) {
+                                msgHandle.reject(msgData.exception, msgData);
+                            } else {
+                                msgHandle.resolve(msgData)
+                            }
+                            isResolveHandle = true;
+                            delete this.msgHandler[msgData.msgId]; // remove the reponse handle
+                        } else {
+                            (obj as any).message({
+                                ...event,
+                                data: msgData
+                            }, api);
+                        }
+                    } else if(/_Response$/.test(msgData.type)) {
+                        const msgHandle = this.msgHandler[msgData.msgId];
+                        if(msgHandle) {
+                            if(msgData.exception) {
+                                msgHandle.reject(msgData.exception, msgData);
+                            } else {
+                                msgHandle.resolve(msgData)
+                            }
+                            isResolveHandle = true;
+                            delete this.msgHandler[msgData.msgId];
+                        }
+                    }
+                });
+                if(/_Response$/.test(msgData.type) && this.msgHandler[msgData.msgId]) {
+                    const msgHandle = this.msgHandler[msgData.msgId];
+                    if(msgHandle) {
+                        if(msgData.exception) {
+                            msgHandle.reject(msgData.exception, msgData);
+                        } else {
+                            msgHandle.resolve(msgData)
+                        }
+                        isResolveHandle = true;
+                        delete this.msgHandler[msgData.msgId];
+                    }
+                }
+                !isResolveHandle && this.event.emit("onMessage", msgData, event);
+            }
+        } else {
+            if(!utils.isEmpty(event.data)) {
+                this.com.decodeMsgPackage(event.data, this.isNode).then((binMsgData) => {
+                    if(!this.file.onMessage(binMsgData, api)) {
+                        this.error("Not support data");
+                    }
+                }).catch((err) => {
+                    this.error(err?.exception?.stack || err?.stack || err.message);
+                });
+            } else {
+                this.error("Not data returned");
             }
         }
-        this.models.forEach((Model: AModel) => {
-            const uid = (Model as any).modelId;
-            const useMessages: string[] = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Model) || [];
-            if(useMessages.includes(msgData.type) || useMessages.length <= 0) {
-                const obj:AModel = getObjFromInstance(Model as any, this);
-                const msgHandle = this.msgHandler[msgData.msgId];
-                if(!this.modelPools[uid]) {
-                    this.mountModel(obj);
-                    this.modelPools[uid] = obj;
-                }
-                if(msgHandle) {
-                    if(msgData.exception) {
-                        msgHandle.reject(msgData.exception, msgData);
-                    } else {
-                        msgHandle.resolve(msgData)
-                    }
-                    isResolveHandle = true;
-                    delete this.msgHandler[msgData.msgId]; // remove the reponse handle
-                } else {
-                    (obj as any).message({
-                        ...event,
-                        data: msgData
-                    });
-                }
-            } else if(/_Response$/.test(msgData.type)) {
-                const msgHandle = this.msgHandler[msgData.msgId];
-                if(msgHandle) {
-                    if(msgData.exception) {
-                        msgHandle.reject(msgData.exception, msgData);
-                    } else {
-                        msgHandle.resolve(msgData)
-                    }
-                    isResolveHandle = true;
-                    delete this.msgHandler[msgData.msgId];
-                }
-            }
-        });
-        if(/_Response$/.test(msgData.type) && this.msgHandler[msgData.msgId]) {
-            const msgHandle = this.msgHandler[msgData.msgId];
-            if(msgHandle) {
-                if(msgData.exception) {
-                    msgHandle.reject(msgData.exception, msgData);
-                } else {
-                    msgHandle.resolve(msgData)
-                }
-                isResolveHandle = true;
-                delete this.msgHandler[msgData.msgId];
-            }
-        }
-        !isResolveHandle && this.event.emit("onMessage", msgData, event);
     }
     private onClose(event: CloseEvent): void {
         const code = event.code;
@@ -314,22 +371,26 @@ export class WebClient<IMsg={}, UseModel={}> {
                 this.isRetryConnect = true;
                 const time = setTimeout(() => {
                     this.retryCount += 1;
-                    this.dispose();
-                    this.start(this.startOption);
-                    clearTimeout(time);
+                    if(this.socket && (this.socket.readyState === 1 || this.socket.CONNECTING)) {
+                        clearTimeout(time);
+                    } else {
+                        this.dispose();
+                        this.start(this.startOption);
+                        clearTimeout(time);
+                    }
                 }, 2000);
             } else {
                 this.log.info("尝试重新链接失败。[CT_NO_CONFIG]");
             }
         }
     }
-    private decodeData(msgData: any): IMsgData {
+    private decodeData(msgData: any): IMsgData| null {
         if(utils.isString(msgData)) {
             return JSON.parse(msgData);
         } else if(utils.isObject(msgData)) {
             return msgData as any;
         } else {
-            return {} as any;
+            return null;
         }
     }
     info(msg: string) {

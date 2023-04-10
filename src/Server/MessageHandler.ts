@@ -26,12 +26,13 @@ export class MessageHandler {
     public getClients!: () => IClientInstanceInfo[];
     public sendToEx!: (toUsers: string[], msgData: IMsgData) => any;
     public sendToAllEx!: (msgData: IMsgData) => any;
+    public getClientById!: (findClientId: string) => Client|null;
 
     private msgHandle: any = {};
 
     constructor(
         private log: Log,
-        private com: CommonUtils,
+        private com: CommonUtils
     ) {
         this.log.init();
     }
@@ -68,17 +69,35 @@ export class MessageHandler {
             }
         });
     }
-    public onMessage<T={}>(clientId: string, msgData: IMsgData<T>, event: MessageEvent, api: IServerClientData): void {
+    public onMessage<T={}>(msgData: IMsgData<T>, event: MessageEvent, api: IServerClientData): void {
         const AllModels = this.getAllModel();
+        if(msgData.toUsers && msgData.toUsers.length > 0) {
+            const sendData = { ...msgData };
+            sendData.toUsers = null;
+            sendData.fromUser = api.uid;
+            for(const userId of msgData.toUsers) {
+                const client = this.getClientById(userId);
+                if(client) {
+                    client.socket.send(JSON.stringify(sendData));
+                    if(msgData.type === "GET_FILE_META_DD53B78F790FE48FAEB09E004B0F" ||
+                    msgData.type === "CONST_READY_FILE_META_DD53B78F790FE48FAEB09E004B0F" ||
+                    msgData.type === "GetLogFile") {
+                        console.log("redirect to:", sendData);
+                        console.log("toUserId:", userId);
+                    }
+                }
+            }
+            return;
+        }
         AllModels.forEach((Model: ASevModel) => {
             const useMessages: any[] = Reflect.getMetadata(CONST_MESSAGE_USE_FILTERKEYS, Model) || [];
             if(useMessages.includes(msgData.type) || useMessages.length <= 0) {
                 const obj: any = this.getModel(Model as any);
                 if(typeof obj.onMessage === "function") {
-                    obj.onMessage({ ...event, data: { ...msgData, fromUser: clientId }, dataType: msgData.type}, {
+                    obj.onMessage({ ...event, data: { ...msgData, fromUser: api.uid }, dataType: msgData.type}, {
                         ...api,
                         reply: (data: any) => {
-                            this.sendToEx([clientId], {
+                            this.sendToEx([api.uid], {
                                 ...data,
                                 waitReply: false,
                                 fromUser:  msgData.fromUser || "ApplicationServer",

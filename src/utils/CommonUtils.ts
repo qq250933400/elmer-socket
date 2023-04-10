@@ -1,4 +1,4 @@
-import { Common, queueCallFunc, Service } from "elmer-common";
+import { Common, queueCallFunc, Service, utils } from "elmer-common";
 
 export interface IArrayBufferMsg<T={}> {
     info: T;
@@ -12,10 +12,13 @@ export class CommonUtils extends Common {
         if(!this.isNode()) {
             if(typeof (<any>Blob.prototype).text !== "function") {
                 (<any>Blob.prototype).text = function():Promise<any> {
-                    return new Promise<any>((resolve: Function) => {
+                    return new Promise<any>((resolve: Function, rejects) => {
                         const fileReader = new FileReader();
                         fileReader.onload = (res) => {
                             resolve(res.target?.result);
+                        };
+                        fileReader.onerror = (err) => {
+                            rejects(err);
                         };
                         fileReader.readAsText(this);
                     });
@@ -46,6 +49,12 @@ export class CommonUtils extends Common {
         } catch {
             return true;
         }
+    }
+    isBlob(val: any): val is Blob {
+        return utils.getType(val) === "[object Blob]";
+    }
+    isArrayBuffer(val: any): val is ArrayBuffer {
+        return utils.getType(val) === "[object ArrayBuffer]";
     }
     /**
      * 创建数据包
@@ -142,7 +151,7 @@ export class CommonUtils extends Common {
                             const infoData = data.slice(data.size - lenValue - 5, data.size - 5);
                             (infoData as any).text().then((jsonData: string) => {
                                 _resolve({
-                                    info: JSON.parse(jsonData),
+                                    ...JSON.parse(jsonData),
                                     data: data.slice(0, data.size - lenValue - 5)
                                 });
                             }).catch((_err:any) => {
@@ -180,8 +189,10 @@ export class CommonUtils extends Common {
             data.copy(tagBuffer, 0, data.length - 3);
             if(tagBuffer.toString() !== tag) {
                 reject({
-                    statusCode: "T_8004",
-                    message: "Data tag not matched"
+                    exception: {
+                        statusCode: "T_8004",
+                        message: "Data tag not matched"
+                    }
                 });
             } else {
                 const sizeBuffer = Buffer.alloc(2);
@@ -195,7 +206,7 @@ export class CommonUtils extends Common {
                 data.copy(infoBuffer, 0, data.length - sizeValue - 5, data.length - 5);
                 data.copy(dataBuffer, 0, 0, dataSize);
                 resolve({
-                    info: JSON.parse(infoBuffer.toString()),
+                    ...JSON.parse(infoBuffer.toString()),
                     data: dataBuffer
                 });
             }

@@ -3,10 +3,31 @@ import { Observe } from "elmer-common";
 import { IMsgData, IMsgEvent } from "../data/IMessage";
 import { IClientConfig } from "../config/IClientConfig";
 import { BaseLog } from "../common/BaseLog";
+import { ISendFileOptions } from "src/common/FileTransfer";
 
 interface ISocketOption<IMsg = {},UseModel={}> {
     send(data: IMsgData<IMsg>):Promise<any>;
     invoke: <ModelName extends keyof UseModel>(model: ModelName, method: keyof UseModel[ModelName], ...args: any[]) => Promise<any>;
+}
+
+interface IReplyData<T={}> {
+    data: T,
+    exception: {
+        statusCode?: string;
+        message: string;
+    }
+}
+
+export interface IClientApi<T={}> {
+    socket: WebSocket;
+    fromUser: string|null;
+    reply: (data: IReplyData<T>) => void;
+}
+
+type TypeExtendsEvent = Omit<IMsgEvent, "onMessage">;
+
+interface IModelEvent<IMsg={}> extends TypeExtendsEvent {
+    onMessage<MsgType extends keyof IMsg>(event: MessageEvent<{ type: MsgType, data: IMsg[MsgType] }>, api: IClientApi): void;
 }
 
 export abstract class AModel<TypeMsg={}, UseModel={}> {
@@ -17,17 +38,18 @@ export abstract class AModel<TypeMsg={}, UseModel={}> {
 
     public static modelId: string;
     public option!: ISocketOption<UseModel>;
+    public sendFile!: (options: ISendFileOptions) => Promise<Blob>;
 
-    private event: Observe<IMsgEvent>;
+    private event: Observe<IModelEvent>;
     
     constructor() {
-        this.event = new Observe<IMsgEvent>();
+        this.event = new Observe<IModelEvent>();
         this.event.on("onClose", () => {
             this.event.unBind("onMessage");
             this.event.unBind("onClose");
         });
     }
-    public abstract onMessage(event: MessageEvent): void;
+    public abstract onMessage(event: MessageEvent, api: IClientApi<any>): void;
     public on<Name extends keyof IMsgEvent>(eventName: Name, callback: IMsgEvent[Name]): void {
         if(eventName === "onMessage") {
             this.event.on("onMessage", callback as any);
@@ -44,8 +66,8 @@ export abstract class AModel<TypeMsg={}, UseModel={}> {
     protected close(): void {
         this.event.emit("onClose");
     }
-    protected message(event: MessageEvent): void {
-        typeof this.onMessage === "function" && this.onMessage(event);
-        typeof this.onMessage !== "function"  && this.event.emit("onMessage", event);
+    protected message(event: MessageEvent, api: IClientApi): void {
+        typeof this.onMessage === "function" && this.onMessage(event, api);
+        typeof this.onMessage !== "function"  && this.event.emit("onMessage", event, api);
     }
 }

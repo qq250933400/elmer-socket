@@ -1,5 +1,5 @@
 import { WSClient, AModel } from "../src/WebClient";
-import { createInstance } from "elmer-common";
+import { createInstance, utils } from "elmer-common";
 
 interface IChat {
     logon: {
@@ -69,3 +69,5 @@ app.start({
     });
     app.invoke("user", "test");
 });
+
+console.log("----UID:", utils.guid().replace(/[-]{1,}/g, "").toUpperCase());
